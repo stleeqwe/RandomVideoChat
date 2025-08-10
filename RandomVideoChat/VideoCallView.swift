@@ -276,74 +276,82 @@ struct VideoCallView: View {
                 
                 Spacer()
 
-                // 하단 컨트롤 버튼들 (개선된 디자인)
-                HStack(spacing: 25) {
-                    // 음소거 버튼
+                // Modern control buttons with glassmorphism
+                HStack(spacing: 28) {
+                    // Enhanced mute button
                     Button(action: toggleMute) {
                         ZStack {
                             Circle()
-                                .fill(isMuted ? Color.red.opacity(0.9) : Color.white.opacity(0.2))
-                                .frame(width: 55, height: 55)
+                                .fill(
+                                    isMuted ? 
+                                    LinearGradient(
+                                        colors: [
+                                            Color(.sRGB, red: 0.9, green: 0.2, blue: 0.2),
+                                            Color(.sRGB, red: 1.0, green: 0.3, blue: 0.3)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ) :
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.25),
+                                            Color.white.opacity(0.15)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 60, height: 60)
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.4),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                )
                             
-                            Circle()
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                .frame(width: 55, height: 55)
-                            
-                            Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white)
+                            ZStack {
+                                Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
+                                    .font(.system(size: 26, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                                    .blur(radius: 6)
+                                
+                                Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
+                                    .font(.system(size: 26, weight: .medium))
+                                    .foregroundStyle(Color.white)
+                            }
                         }
+                        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
+                        .scaleEffect(isMuted ? 1.05 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isMuted)
                     }
 
-                    // 60초 추가 버튼 (개선된 디자인)
+                    // Enhanced +60s heart button
                     Button(action: {
                         if heartCount > 0 && !opponentUserId.isEmpty {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 showHeartAnimation = true
                             }
                             
->>>>>>> fefefa2 (Initial Commit)
                             heartCount -= 1
                             UserDefaults.standard.set(heartCount, forKey: "heartCount")
                             timeRemaining += 60
                             MatchingManager.shared.updateCallTimer(timeRemaining)
                             userManager.sendHeartToOpponent(opponentUserId)
-<<<<<<< HEAD
-                            // 현재 사용자의 Firestore 하트 개수 업데이트
-=======
                             
->>>>>>> fefefa2 (Initial Commit)
                             if let uid = Auth.auth().currentUser?.uid {
                                 userManager.updateHeartCount(uid: uid, newCount: heartCount)
                             }
                             if isTimerStarted {
                                 startTimer()
                             }
-<<<<<<< HEAD
-                        }
-                    }) {
-                        VStack(spacing: 5) {
-                            Image(systemName: "heart.fill")
-                                .font(.title2)
-                            Text("60초 추가")
-                                .font(.caption)
-                        }
-                        .foregroundColor(.white)
-                        .frame(width: 80, height: 60)
-                        .background(heartCount > 0 ? Color.purple : Color.gray.opacity(0.3))
-                        .cornerRadius(15)
-                    }
-                    .disabled(heartCount <= 0)
-
-                    // 카메라 전환 버튼
-                    Button(action: switchCamera) {
-                        Image(systemName: "camera.rotate")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(Color.gray.opacity(0.6))
-                            .clipShape(Circle())
-=======
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                 showHeartAnimation = false
@@ -351,152 +359,267 @@ struct VideoCallView: View {
                         }
                     }) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: 18)
                                 .fill(
+                                    heartCount > 0 ?
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            heartCount > 0 ? Color(red: 0.6, green: 0.2, blue: 0.8) : Color.gray.opacity(0.3),
-                                            heartCount > 0 ? Color(red: 0.8, green: 0.3, blue: 0.9) : Color.gray.opacity(0.2)
+                                        gradient: Gradient(stops: [
+                                            .init(color: Color(.sRGB, red: 0.6, green: 0.2, blue: 0.8), location: 0.0),
+                                            .init(color: Color(.sRGB, red: 0.8, green: 0.3, blue: 0.9), location: 0.6),
+                                            .init(color: Color(.sRGB, red: 0.5, green: 0.4, blue: 0.9), location: 1.0)
                                         ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ) :
+                                    LinearGradient(
+                                        colors: [
+                                            Color.gray.opacity(0.3),
+                                            Color.gray.opacity(0.2)
+                                        ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                                .frame(width: 90, height: 65)
+                                .frame(width: 95, height: 68)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18)
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(heartCount > 0 ? 0.4 : 0.2),
+                                                    Color.white.opacity(heartCount > 0 ? 0.1 : 0.05)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                )
                             
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                .frame(width: 90, height: 65)
-                            
-                            VStack(spacing: 4) {
-                                Image(systemName: "heart.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.white)
+                            VStack(spacing: 6) {
+                                ZStack {
+                                    Image(systemName: "heart.fill")
+                                        .font(.system(size: 24, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                        .blur(radius: 4)
+                                    
+                                    Image(systemName: "heart.fill")
+                                        .font(.system(size: 24, weight: .medium))
+                                        .foregroundStyle(Color.white)
+                                }
                                 
                                 Text("+60s")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(Color.white)
+                                    .tracking(0.5)
                             }
                         }
+                        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
+                        .scaleEffect(heartCount <= 0 ? 0.92 : 1)
+                        .opacity(heartCount <= 0 ? 0.6 : 1)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: heartCount <= 0)
                     }
                     .disabled(heartCount <= 0)
-                    .scaleEffect(heartCount <= 0 ? 0.95 : 1)
 
-                    // 카메라 전환 버튼
+                    // Enhanced camera flip button
                     Button(action: switchCamera) {
                         ZStack {
                             Circle()
-                                .fill(Color.white.opacity(0.2))
-                                .frame(width: 55, height: 55)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.25),
+                                            Color.white.opacity(0.15)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 60, height: 60)
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.4),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                )
                             
-                            Circle()
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                .frame(width: 55, height: 55)
-                            
-                            Image(systemName: "camera.rotate")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white)
+                            ZStack {
+                                Image(systemName: "camera.rotate")
+                                    .font(.system(size: 26, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                                    .blur(radius: 6)
+                                
+                                Image(systemName: "camera.rotate")
+                                    .font(.system(size: 26, weight: .medium))
+                                    .foregroundStyle(Color.white)
+                            }
                         }
->>>>>>> fefefa2 (Initial Commit)
+                        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
+                    }
                     }
 
-                    // 통화 종료 버튼
+                    // Enhanced end call button
                     Button(action: endVideoCall) {
-<<<<<<< HEAD
-                        Image(systemName: "phone.down.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(Color.red)
-                            .clipShape(Circle())
-                    }
-                }
-                .padding(.bottom, 30)
-            }
-
-            // 통화 종료 메시지
-            if showEndMessage {
-                Color.black.opacity(0.8)
-                    .ignoresSafeArea()
-                VStack(spacing: 20) {
-                    Text(endMessageText)
-                        .font(.title2)
-                        .foregroundColor(.white)
-                    Button("확인") {
-                        // 팝업 상태 초기화 후 모달 닫기
-                        showEndMessage = false
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 10)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-=======
                         ZStack {
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.9, green: 0.2, blue: 0.2),
-                                            Color(red: 1, green: 0.3, blue: 0.3)
+                                        gradient: Gradient(stops: [
+                                            .init(color: Color(.sRGB, red: 0.9, green: 0.2, blue: 0.2), location: 0.0),
+                                            .init(color: Color(.sRGB, red: 1.0, green: 0.3, blue: 0.3), location: 0.6),
+                                            .init(color: Color(.sRGB, red: 0.85, green: 0.15, blue: 0.25), location: 1.0)
                                         ]),
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                                .frame(width: 65, height: 65)
+                                .frame(width: 68, height: 68)
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.4),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.8
+                                        )
+                                )
                             
-                            Image(systemName: "phone.down.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white)
+                            ZStack {
+                                Image(systemName: "phone.down.fill")
+                                    .font(.system(size: 30, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                                    .blur(radius: 8)
+                                
+                                Image(systemName: "phone.down.fill")
+                                    .font(.system(size: 30, weight: .medium))
+                                    .foregroundStyle(Color.white)
+                            }
                         }
+                        .shadow(color: Color(.sRGB, red: 0.9, green: 0.2, blue: 0.2).opacity(0.5), radius: 20, x: 0, y: 10)
                     }
                 }
-                .padding(.bottom, 50)
+                .padding(.bottom, 55)
             }
 
-            // 통화 종료 메시지 (개선된 디자인)
+            // Modern end call message overlay
             if showEndMessage {
                 ZStack {
-                    Color.black.opacity(0.85)
+                    Color.black.opacity(0.88)
                         .ignoresSafeArea()
-                        .blur(radius: 20)
+                        .blur(radius: 25)
                     
-                    VStack(spacing: 25) {
-                        Image(systemName: timeRemaining <= 0 ? "clock.badge.xmark" : "phone.down.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white.opacity(0.9))
+                    VStack(spacing: 30) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.1),
+                                            Color.white.opacity(0.05)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 100, height: 100)
+                                .blur(radius: 20)
+                            
+                            Image(systemName: timeRemaining <= 0 ? "clock.badge.xmark.fill" : "phone.down.circle.fill")
+                                .font(.system(size: 65, weight: .medium))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white,
+                                            Color.white.opacity(0.8)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
                         
                         Text(endMessageText)
-                            .font(.system(size: 24, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
+                            .font(.system(size: 26, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color.white)
+                            .multilineTextAlignment(.center)
                         
                         Button(action: {
                             showEndMessage = false
                             presentationMode.wrappedValue.dismiss()
                         }) {
                             Text("확인")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 40)
-                                .padding(.vertical, 14)
+                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.white)
+                                .padding(.horizontal, 45)
+                                .padding(.vertical, 16)
                                 .background(
+                                    .ultraThinMaterial,
+                                    in: Capsule()
+                                )
+                                .overlay(
                                     Capsule()
-                                        .fill(Color.blue)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(.sRGB, red: 0.2, green: 0.4, blue: 1.0).opacity(0.7),
+                                                    Color(.sRGB, red: 0.4, green: 0.6, blue: 1.0).opacity(0.5)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.4),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
                                 )
                         }
+                        .shadow(color: Color(.sRGB, red: 0.3, green: 0.5, blue: 1.0).opacity(0.4), radius: 15, x: 0, y: 8)
                     }
-                    .padding(40)
+                    .padding(45)
                     .background(
-                        RoundedRectangle(cornerRadius: 25)
-                            .fill(Color.black.opacity(0.5))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 25)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        .ultraThinMaterial,
+                        in: RoundedRectangle(cornerRadius: 28)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.3),
+                                        Color.white.opacity(0.08)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.5
                             )
                     )
->>>>>>> fefefa2 (Initial Commit)
+                    .shadow(color: Color.black.opacity(0.3), radius: 30, x: 0, y: 15)
+                }
                 }
             }
         }

@@ -110,40 +110,8 @@ struct AuthenticationView: View {
                                 .opacity(0.3 - Double(index) * 0.1)
                         }
                         
-                        // Main icon with glassmorphism
-                        ZStack {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color.white.opacity(0.6),
-                                                    Color.white.opacity(0.1)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 2
-                                        )
-                                )
-                                .frame(width: 100, height: 100)
-                            
-                            Image(systemName: "video.circle.fill")
-                                .font(.system(size: 65, weight: .medium))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white,
-                                            Color(.sRGB, red: 0.9, green: 0.9, blue: 1.0)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        }
-                        .shadow(color: Color(.sRGB, red: 0.6, green: 0.2, blue: 0.8).opacity(0.4), radius: 25, x: 0, y: 15)
+                        // Modern app logo
+                        LogoPlaceholderView(size: 110, appName: "5SEC")
                     }
                     
                     VStack(spacing: 8) {
