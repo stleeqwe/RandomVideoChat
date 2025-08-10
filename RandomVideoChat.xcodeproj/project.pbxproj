@@ -20,6 +20,7 @@
 		8871CC7C2E40E5560096BD2F /* MatchingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC7B2E40E5560096BD2F /* MatchingView.swift */; };
 		8871CC7E2E40E5F10096BD2F /* VideoCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC7D2E40E5F10096BD2F /* VideoCallView.swift */; };
 		8871CC812E40E78A0096BD2F /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC802E40E78A0096BD2F /* CameraView.swift */; };
+		8889DB3F2E48C1CE0040E898 /* CarterOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */; };
 		88C07E252E4177A8004A3F93 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C07E242E4177A8004A3F93 /* User.swift */; };
 		88C07E272E4177C0004A3F93 /* UserManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C07E262E4177C0004A3F93 /* UserManager.swift */; };
 		88C07E292E4178D1004A3F93 /* MatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C07E282E4178D1004A3F93 /* MatchingManager.swift */; };
@@ -71,6 +72,7 @@
 		8871CC7D2E40E5F10096BD2F /* VideoCallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCallView.swift; sourceTree = "<group>"; };
 		8871CC7F2E40E7380096BD2F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8871CC802E40E78A0096BD2F /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
+		8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "CarterOne-Regular.ttf"; path = "../../../Downloads/Carter_One/CarterOne-Regular.ttf"; sourceTree = "<group>"; };
 		88C07E242E4177A8004A3F93 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		88C07E262E4177C0004A3F93 /* UserManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserManager.swift; sourceTree = "<group>"; };
 		88C07E282E4178D1004A3F93 /* MatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchingManager.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 		8871CC492E40DAB90096BD2F /* RandomVideoChat */ = {
 			isa = PBXGroup;
 			children = (
+				8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */,
 				88DFC5CA2E416F5100A601E4 /* RandomVideoChat.entitlements */,
 				8871CC7F2E40E7380096BD2F /* Info.plist */,
 				8871CC742E40DEF60096BD2F /* GoogleService-Info.plist */,
@@ -304,6 +307,7 @@
 				8871CC522E40DABB0096BD2F /* Preview Assets.xcassets in Resources */,
 				8871CC4F2E40DABB0096BD2F /* Assets.xcassets in Resources */,
 				8871CC752E40DEF60096BD2F /* GoogleService-Info.plist in Resources */,
+				8889DB3F2E48C1CE0040E898 /* CarterOne-Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -19,13 +19,25 @@ struct ContentView: View {
                     )
             } else if !isAuthenticated {
                 // 로그인 화면
-                AuthenticationView(isAuthenticated: $isAuthenticated)
+                if #available(iOS 15.0, *) {
+                    AuthenticationView(isAuthenticated: $isAuthenticated)
+                } else {
+                    Text("iOS 15.0+ required").foregroundColor(.white)
+                }
             } else if showSplash {
                 // 스플래시 화면
-                SplashView(showSplash: $showSplash)
+                if #available(iOS 15.0, *) {
+                    SplashView(showSplash: $showSplash)
+                } else {
+                    Color.black.ignoresSafeArea()
+                }
             } else {
                 // 메인 화면
-                MainView()
+                if #available(iOS 15.0, *) {
+                    MainView()
+                } else {
+                    Text("iOS 15.0+ required").foregroundColor(.white)
+                }
             }
         }
         .onAppear {

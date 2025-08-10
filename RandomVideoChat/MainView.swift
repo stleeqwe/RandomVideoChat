@@ -2,284 +2,100 @@ import SwiftUI
 import FirebaseAuth
 import AVFoundation
 
+@available(iOS 15.0, *)
 struct MainView: View {
     @State private var isCameraOn = true
     @State private var heartCount = 3  // 기본 하트 개수
     @State private var showMatchingView = false
     @StateObject private var userManager = UserManager.shared
     @State private var permissionsGranted = false
-<<<<<<< HEAD
-=======
     @State private var swipeOffset: CGFloat = 0
     @State private var showSwipeHint = true
->>>>>>> fefefa2 (Initial Commit)
     @State private var showPermissionAlert = false
     @State private var permissionMessage = ""
     
     var body: some View {
         ZStack {
-            // 실제 카메라 프리뷰
-            CameraPreview(isOn: $isCameraOn)
-            
-<<<<<<< HEAD
-=======
-            // Enhanced gradient overlay with multiple layers
-            ZStack {
-                // Top gradient
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color.black.opacity(0.6), location: 0.0),
-                        .init(color: Color.clear, location: 0.3)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 200)
-                .ignoresSafeArea(edges: .top)
-                
-                VStack {
-                    Spacer()
-                    // Bottom gradient with modern curve
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: Color.clear, location: 0.0),
-                            .init(color: Color.black.opacity(0.2), location: 0.4),
-                            .init(color: Color.black.opacity(0.7), location: 0.8),
-                            .init(color: Color.black.opacity(0.9), location: 1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 300)
-                    .ignoresSafeArea(edges: .bottom)
+            if isCameraOn {
+                // 실제 카메라 프리뷰
+                CameraPreview(isOn: $isCameraOn)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // 카메라 off 상태 기본 프로필 화면
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 200))
+                        .foregroundColor(.white.opacity(0.3))
                 }
             }
             
->>>>>>> fefefa2 (Initial Commit)
+            // 전체 화면 카메라 오버레이 (상단과 하단에 그라데이션 적용)
+            LinearGradient(
+                gradient: Gradient(stops: [
+                    .init(color: Color.black.opacity(0.4), location: 0.0),  // 상단 어두움
+                    .init(color: Color.black.opacity(0.05), location: 0.25), // 중간 위쪽 밝음
+                    .init(color: Color.black.opacity(0.02), location: 0.5),  // 중앙 완전 밝음
+                    .init(color: Color.black.opacity(0.05), location: 0.75), // 중간 아래쪽 밝음
+                    .init(color: Color.black.opacity(0.7), location: 1.0)    // 하단 어두움
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
             VStack {
                 Spacer()
                 
-                // 하단 UI 요소들
                 HStack {
                     Spacer()
                     
-<<<<<<< HEAD
-                    // 카메라 ON/OFF 버튼
-                    Button(action: {
-                        isCameraOn.toggle()
-                    }) {
-                        Image(systemName: isCameraOn ? "camera.fill" : "camera")
-                            .font(.system(size: 30))
-                            .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Color.black.opacity(0.5))
-                            .clipShape(Circle())
-=======
-                    // Modern camera toggle button
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    // 카메라 아이콘과 하트 카운터 (우측 상단)
+                    VStack(spacing: 12) {
+                        Button(action: {
                             isCameraOn.toggle()
-                        }
-                    }) {
-                        ZStack {
-                            // Glassmorphism background
-                            Circle()
-                                .fill(
-                                    .ultraThinMaterial,
-                                    in: Circle()
-                                )
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color.white.opacity(0.6),
-                                                    Color.white.opacity(0.1)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 1.5
-                                        )
-                                )
-                                .frame(width: 64, height: 64)
-                                .shadow(
-                                    color: Color.black.opacity(0.2),
-                                    radius: 15,
-                                    x: 0,
-                                    y: 8
-                                )
-                            
-                            // Icon with subtle glow
-                            ZStack {
-                                Image(systemName: isCameraOn ? "camera.fill" : "camera")
-                                    .font(.system(size: 24, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.3))
-                                    .blur(radius: 8)
-                                
-                                Image(systemName: isCameraOn ? "camera.fill" : "camera")
-                                    .font(.system(size: 24, weight: .medium))
-                                    .foregroundStyle(Color.white)
-                                    .scaleEffect(isCameraOn ? 1.0 : 0.85)
-                            }
-                        }
->>>>>>> fefefa2 (Initial Commit)
-                    }
-                    .padding(.trailing, 20)
-                }
-                
-<<<<<<< HEAD
-                // 하트 개수 표시
-                HStack {
-                    Spacer()
-                    
-                    HStack(spacing: 5) {
-                        Image(systemName: "heart.fill")
-                            .foregroundColor(.red)
-                        Text("\(heartCount)")
-                            .foregroundColor(.white)
-                            .font(.system(size: 18, weight: .bold))
-                    }
-                    .padding(.horizontal, 15)
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.5))
-                    .cornerRadius(20)
-=======
-                // Modern heart counter with glassmorphism
-                HStack {
-                    Spacer()
-                    
-                    HStack(spacing: 10) {
-                        // Animated heart icon
-                        ZStack {
-                            Image(systemName: "heart.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(.sRGB, red: 1.0, green: 0.4, blue: 0.5),
-                                            Color(.sRGB, red: 0.9, green: 0.2, blue: 0.4)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .blur(radius: 4)
-                                .opacity(0.8)
-                            
-                            Image(systemName: "heart.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(.sRGB, red: 1.0, green: 0.4, blue: 0.5),
-                                            Color(.sRGB, red: 0.9, green: 0.2, blue: 0.4)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                        }) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white)
                         }
                         
-                        Text("\(heartCount)")
-                            .font(.system(size: 19, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.white)
-                            .monospacedDigit()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
-                    .background(
-                        .ultraThinMaterial,
-                        in: Capsule()
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.4),
-                                        Color.white.opacity(0.1)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.2
-                            )
-                    )
-                    .shadow(color: .black.opacity(0.25), radius: 15, x: 0, y: 8)
->>>>>>> fefefa2 (Initial Commit)
-                    .padding(.trailing, 20)
-                }
-                .padding(.bottom, 20)
-                
-<<<<<<< HEAD
-                // SWIPE & START 텍스트
-                VStack(spacing: 10) {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 30))
-                        .foregroundColor(.white)
-                    
-                    Text("SWIPE & START")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                .padding(.bottom, 50)
-=======
-                // Modern swipe indicator with enhanced animations
-                VStack(spacing: 16) {
-                    // Floating chevron with trail effect
-                    ZStack {
-                        ForEach(0..<3, id: \.self) { index in
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 24 - CGFloat(index * 4), weight: .semibold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white.opacity(0.9 - Double(index) * 0.3),
-                                            Color.white.opacity(0.5 - Double(index) * 0.2)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .offset(y: swipeOffset + CGFloat(index * 8))
-                                .blur(radius: CGFloat(index))
+                        HStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.red)
+                            Text("X  \(heartCount)")
+                                .font(.custom("Carter One", size: 22))
+                                .foregroundColor(.white)
                         }
                     }
-                    .opacity(showSwipeHint ? 1 : 0.6)
-                    
-                    // Styled action text
-                    Text("SWIPE UP TO START")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color.white,
-                                    Color.white.opacity(0.8)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .tracking(2.5)
-                        .opacity(showSwipeHint ? 0.9 : 0.5)
-                    
-                    // Subtle indicator dots
-                    HStack(spacing: 6) {
+                    .padding(.trailing, 20)
+                }
+                .padding(.bottom, 30)
+                
+                // 인터랙티브 스와이프 인디케이터 (중앙 하단)
+                VStack(spacing: 16) {
+                    // 순차적으로 나타나는 상향 화살표
+                    VStack(spacing: 6) {
                         ForEach(0..<3, id: \.self) { index in
-                            Circle()
-                                .fill(Color.white.opacity(0.6))
-                                .frame(width: 4, height: 4)
-                                .scaleEffect(showSwipeHint ? 1 : 0.7)
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.white)
+                                .opacity(showSwipeHint ? 1.0 : 0.3)
+                                .scaleEffect(showSwipeHint ? 1.0 : 0.7)
                                 .animation(
-                                    .easeInOut(duration: 1.2)
+                                    .easeInOut(duration: 0.6)
                                         .repeatForever(autoreverses: true)
                                         .delay(Double(index) * 0.2),
                                     value: showSwipeHint
                                 )
                         }
                     }
-                    .opacity(0.7)
+                    .offset(y: swipeOffset)
+                    
+                    Text("SWIPE UP & START")
+                        .font(.custom("Carter One", size: 20))
+                        .foregroundColor(.white)
                 }
                 .padding(.bottom, 70)
                 .onAppear {
@@ -299,7 +115,6 @@ struct MainView: View {
                         showSwipeHint.toggle()
                     }
                 }
->>>>>>> fefefa2 (Initial Commit)
             }
             
             // 🆕 디버그 정보 (개발용)

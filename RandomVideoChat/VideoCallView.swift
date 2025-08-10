@@ -4,6 +4,7 @@ import FirebaseAuth
 import FirebaseFirestore
 import FirebaseDatabase
 
+@available(iOS 15.0, *)
 struct VideoCallView: View {
     @State private var isCallActive = false
     @State private var timeRemaining = 5
@@ -15,10 +16,7 @@ struct VideoCallView: View {
     @State private var endMessageText = "통화가 종료되었습니다"
     @State private var isCallEnding = false
     @State private var opponentUserId: String = ""
-<<<<<<< HEAD
-=======
     @State private var showHeartAnimation = false
->>>>>>> fefefa2 (Initial Commit)
 
     @StateObject private var userManager = UserManager.shared
     @StateObject private var agoraManager = AgoraManager.shared
@@ -30,10 +28,6 @@ struct VideoCallView: View {
             // 원격 비디오 전체 화면
             AgoraVideoView(isLocal: false)
                 .ignoresSafeArea()
-<<<<<<< HEAD
-
-            // 로컬 비디오 (작은 화면)
-=======
             
             // 그라데이션 오버레이 (상단/하단)
             VStack {
@@ -59,16 +53,10 @@ struct VideoCallView: View {
             }
 
             // Modern PIP local video with glassmorphism
->>>>>>> fefefa2 (Initial Commit)
             VStack {
                 HStack {
                     Spacer()
                     AgoraVideoView(isLocal: true)
-<<<<<<< HEAD
-                        .frame(width: 100, height: 150)
-                        .cornerRadius(10)
-                        .padding()
-=======
                         .frame(width: 120, height: 175)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         .background(
@@ -97,58 +85,14 @@ struct VideoCallView: View {
                         )
                         .padding()
                         .padding(.top, 55)
->>>>>>> fefefa2 (Initial Commit)
                 }
                 Spacer()
             }
 
-<<<<<<< HEAD
-            // 좌측 하단 타이머/하트 오버레이
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 5) {
-                    Image(systemName: "clock")
-                        .foregroundColor(.white)
-                    Text("\(timeRemaining)초")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-                HStack(spacing: 5) {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                    Text("\(heartCount)")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-            }
-            .padding(.horizontal, 15)
-            .padding(.vertical, 8)
-            .background(Color.black.opacity(0.6))
-            .cornerRadius(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding([.leading, .bottom], 20)
-
-            // 하단 컨트롤 버튼들
-            VStack {
-                Spacer()
-                HStack(spacing: 30) {
-                    // 음소거 버튼
-                    Button(action: toggleMute) {
-                        Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(isMuted ? Color.red : Color.gray.opacity(0.6))
-                            .clipShape(Circle())
-                    }
-
-                    // 60초 추가 버튼
-                    Button(action: {
-                        if heartCount > 0 && !opponentUserId.isEmpty {
-=======
             // 상단 UI (타이머 & 하트)
             VStack {
                 HStack {
-                    // Modern timer with enhanced styling
+                    // 타이머 (좌상단)
                     HStack(spacing: 8) {
                         ZStack {
                             Image(systemName: "clock.fill")
@@ -190,10 +134,7 @@ struct VideoCallView: View {
                     }
                     .padding(.horizontal, 22)
                     .padding(.vertical, 16)
-                    .background(
-                        .ultraThinMaterial,
-                        in: Capsule()
-                    )
+                    .background(.ultraThinMaterial, in: Capsule())
                     .overlay(
                         Capsule()
                             .stroke(
@@ -221,55 +162,19 @@ struct VideoCallView: View {
                     
                     Spacer()
                     
-                    // Enhanced heart counter
-                    HStack(spacing: 10) {
-                        ZStack {
-                            ForEach(0..<2, id: \.self) { index in
-                                Image(systemName: "heart.fill")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(.sRGB, red: 1.0, green: 0.4, blue: 0.5),
-                                                Color(.sRGB, red: 0.9, green: 0.2, blue: 0.4)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .blur(radius: index == 0 ? 0 : 6)
-                                    .opacity(index == 0 ? 1 : 0.6)
-                            }
-                        }
-                        .scaleEffect(showHeartAnimation ? 1.3 : 1)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showHeartAnimation)
-                        
-                        Text("\(heartCount)")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.white)
-                            .monospacedDigit()
+                    // 단순한 하트 카운터
+                    HStack(spacing: 8) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.red)
+                        Text("X\(heartCount)")
+                            .font(.custom("Carter One", size: 16))
+                            .foregroundColor(.white)
                     }
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 16)
-                    .background(
-                        .ultraThinMaterial,
-                        in: Capsule()
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.4),
-                                        Color.white.opacity(0.1)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
-                    .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 6)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.black.opacity(0.3))
+                    .cornerRadius(20)
                 }
                 .padding(.horizontal)
                 .padding(.top, 60)
@@ -333,13 +238,9 @@ struct VideoCallView: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isMuted)
                     }
 
-                    // Enhanced +60s heart button
+                    // 커스텀 60초 추가 버튼
                     Button(action: {
                         if heartCount > 0 && !opponentUserId.isEmpty {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                showHeartAnimation = true
-                            }
-                            
                             heartCount -= 1
                             UserDefaults.standard.set(heartCount, forKey: "heartCount")
                             timeRemaining += 60
@@ -352,72 +253,22 @@ struct VideoCallView: View {
                             if isTimerStarted {
                                 startTimer()
                             }
-                            
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                showHeartAnimation = false
-                            }
                         }
                     }) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(
-                                    heartCount > 0 ?
-                                    LinearGradient(
-                                        gradient: Gradient(stops: [
-                                            .init(color: Color(.sRGB, red: 0.6, green: 0.2, blue: 0.8), location: 0.0),
-                                            .init(color: Color(.sRGB, red: 0.8, green: 0.3, blue: 0.9), location: 0.6),
-                                            .init(color: Color(.sRGB, red: 0.5, green: 0.4, blue: 0.9), location: 1.0)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ) :
-                                    LinearGradient(
-                                        colors: [
-                                            Color.gray.opacity(0.3),
-                                            Color.gray.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 95, height: 68)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18)
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color.white.opacity(heartCount > 0 ? 0.4 : 0.2),
-                                                    Color.white.opacity(heartCount > 0 ? 0.1 : 0.05)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 1.5
-                                        )
-                                )
-                            
-                            VStack(spacing: 6) {
-                                ZStack {
-                                    Image(systemName: "heart.fill")
-                                        .font(.system(size: 24, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.4))
-                                        .blur(radius: 4)
-                                    
-                                    Image(systemName: "heart.fill")
-                                        .font(.system(size: 24, weight: .medium))
-                                        .foregroundStyle(Color.white)
-                                }
-                                
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.blue)
+                                .frame(width: 80, height: 60)
+                            VStack(spacing: 2) {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white)
                                 Text("+60s")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.white)
-                                    .tracking(0.5)
+                                    .font(.custom("Carter One", size: 12))
+                                    .foregroundColor(.white)
                             }
                         }
-                        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
-                        .scaleEffect(heartCount <= 0 ? 0.92 : 1)
-                        .opacity(heartCount <= 0 ? 0.6 : 1)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: heartCount <= 0)
+                            .opacity(heartCount <= 0 ? 0.5 : 1.0)
                     }
                     .disabled(heartCount <= 0)
 
@@ -463,7 +314,6 @@ struct VideoCallView: View {
                             }
                         }
                         .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
-                    }
                     }
 
                     // Enhanced end call button
@@ -565,10 +415,7 @@ struct VideoCallView: View {
                                 .foregroundStyle(Color.white)
                                 .padding(.horizontal, 45)
                                 .padding(.vertical, 16)
-                                .background(
-                                    .ultraThinMaterial,
-                                    in: Capsule()
-                                )
+                                .background(.ultraThinMaterial, in: Capsule())
                                 .overlay(
                                     Capsule()
                                         .fill(
@@ -620,7 +467,6 @@ struct VideoCallView: View {
                     )
                     .shadow(color: Color.black.opacity(0.3), radius: 30, x: 0, y: 15)
                 }
-                }
             }
         }
         .onAppear {
@@ -630,11 +476,7 @@ struct VideoCallView: View {
             if let uid = Auth.auth().currentUser?.uid {
                 userManager.loadCurrentUser(uid: uid)
                 observeHeartCount(uid: uid)
-<<<<<<< HEAD
-                observeNewHeartNotification()   // 하트 알림 관찰 추가
-=======
                 observeNewHeartNotification()
->>>>>>> fefefa2 (Initial Commit)
                 if let currentHeartCount = userManager.currentUser?.heartCount {
                     heartCount = currentHeartCount
                 }
@@ -657,18 +499,6 @@ struct VideoCallView: View {
                     }
                 }
             }
-<<<<<<< HEAD
-            // 통화 종료 관찰
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                MatchingManager.shared.observeCallEnd {
-                    // 상대방이 종료한 경우
-                    guard !isCallEnding else { return }
-                    isCallEnding = true
-                    // 타이머 및 통화 종료 처리
-                    timer?.invalidate()
-                    AgoraManager.shared.endCall()
-                    // 🆕 매칭 큐 제거 및 상태 초기화
-=======
             
             // 통화 종료 관찰
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -677,7 +507,6 @@ struct VideoCallView: View {
                     isCallEnding = true
                     timer?.invalidate()
                     AgoraManager.shared.endCall()
->>>>>>> fefefa2 (Initial Commit)
                     MatchingManager.shared.cancelMatching()
                     MatchingManager.shared.cleanupCallObservers()
                     endMessageText = "통화가 종료되었습니다"
@@ -685,10 +514,6 @@ struct VideoCallView: View {
                 }
             }
         }
-<<<<<<< HEAD
-        // 상대방 입장 후 타이머 시작
-=======
->>>>>>> fefefa2 (Initial Commit)
         .onChange(of: agoraManager.remoteUserJoined) { joined in
             if joined && !isTimerStarted {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -697,10 +522,6 @@ struct VideoCallView: View {
             }
         }
         .onDisappear {
-<<<<<<< HEAD
-            // 화면을 떠날 때 정리
-=======
->>>>>>> fefefa2 (Initial Commit)
             if !isCallEnding {
                 isCallEnding = true
                 MatchingManager.shared.signalCallEnd()
@@ -731,11 +552,7 @@ struct VideoCallView: View {
             }
     }
 
-<<<<<<< HEAD
-    // MARK: - 새 하트 알림 관찰 (상대방이 보낸 하트 수신)
-=======
     // MARK: - 새 하트 알림 관찰
->>>>>>> fefefa2 (Initial Commit)
     func observeNewHeartNotification() {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         Database.database().reference()
@@ -743,18 +560,10 @@ struct VideoCallView: View {
             .child(uid)
             .child("newHeart")
             .observe(.childAdded) { snapshot in
-<<<<<<< HEAD
-                // 하트 +1
-=======
->>>>>>> fefefa2 (Initial Commit)
                 heartCount += 1
                 if let uid = Auth.auth().currentUser?.uid {
                     userManager.updateHeartCount(uid: uid, newCount: heartCount)
                 }
-<<<<<<< HEAD
-                // 사용한 알림 삭제
-=======
->>>>>>> fefefa2 (Initial Commit)
                 snapshot.ref.removeValue()
             }
     }
@@ -765,10 +574,6 @@ struct VideoCallView: View {
         if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {
             AgoraManager.shared.startCall(channel: channelName)
         }
-<<<<<<< HEAD
-        // 타이머는 agoraManager.remoteUserJoined가 true일 때 시작
-=======
->>>>>>> fefefa2 (Initial Commit)
     }
 
     func startTimer() {
@@ -784,18 +589,9 @@ struct VideoCallView: View {
     }
 
     func endVideoCall() {
-<<<<<<< HEAD
-        // 본인이 종료할 때 호출
-        if !isCallEnding {
-            isCallEnding = true
-            // 상대방에게 통화 종료 신호 전송
-            MatchingManager.shared.signalCallEnd()
-            // 🆕 매칭 큐에서 현재 사용자를 제거하고 상태 초기화
-=======
         if !isCallEnding {
             isCallEnding = true
             MatchingManager.shared.signalCallEnd()
->>>>>>> fefefa2 (Initial Commit)
             MatchingManager.shared.cancelMatching()
         }
         timer?.invalidate()
@@ -805,10 +601,6 @@ struct VideoCallView: View {
         showEndMessage = true
     }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> fefefa2 (Initial Commit)
     func toggleMute() {
         isMuted = AgoraManager.shared.toggleMute()
     }
@@ -817,7 +609,3 @@ struct VideoCallView: View {
         AgoraManager.shared.switchCamera()
     }
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> fefefa2 (Initial Commit)

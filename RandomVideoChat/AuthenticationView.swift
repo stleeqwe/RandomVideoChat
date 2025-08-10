@@ -3,6 +3,7 @@ import AuthenticationServices
 import FirebaseAuth
 import CryptoKit
 
+@available(iOS 15.0, *)
 struct AuthenticationView: View {
     @Binding var isAuthenticated: Bool
     @State private var isLoading = false
@@ -10,26 +11,6 @@ struct AuthenticationView: View {
     
     var body: some View {
         ZStack {
-<<<<<<< HEAD
-            // 배경
-            Color.black
-                .ignoresSafeArea()
-            
-            VStack(spacing: 50) {
-                // 앱 로고/타이틀
-                VStack(spacing: 10) {
-                    Image(systemName: "video.circle.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(.white)
-                    
-                    Text("Random")
-                        .font(.system(size: 40, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text("Video Chat")
-                        .font(.system(size: 40, weight: .bold))
-                        .foregroundColor(.white)
-=======
             // Enhanced dynamic gradient background
             ZStack {
                 LinearGradient(
@@ -110,8 +91,74 @@ struct AuthenticationView: View {
                                 .opacity(0.3 - Double(index) * 0.1)
                         }
                         
-                        // Modern app logo
-                        LogoPlaceholderView(size: 110, appName: "5SEC")
+                        // Modern app logo with inline implementation
+                        ZStack {
+                            // Gradient background with multiple layers
+                            ForEach(0..<3, id: \.self) { index in
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(.sRGB, red: 0.8, green: 0.3, blue: 1.0).opacity(0.6 - Double(index) * 0.2),
+                                                Color(.sRGB, red: 0.5, green: 0.6, blue: 1.0).opacity(0.4 - Double(index) * 0.15)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 110 + CGFloat(index * 10), height: 110 + CGFloat(index * 10))
+                                    .blur(radius: CGFloat(index * 5))
+                            }
+                            
+                            // Main logo container
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 110, height: 110)
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.6),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 2
+                                        )
+                                )
+                            
+                            // App name with glow
+                            ZStack {
+                                Text("5SEC")
+                                    .font(.system(size: 27, weight: .black, design: .rounded))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.white.opacity(0.4)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .blur(radius: 8)
+                                
+                                Text("5SEC")
+                                    .font(.system(size: 27, weight: .black, design: .rounded))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.white,
+                                                Color(.sRGB, red: 0.9, green: 0.9, blue: 1.0)
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                            }
+                        }
+                        .shadow(color: Color(.sRGB, red: 0.6, green: 0.3, blue: 0.9).opacity(0.4), radius: 25, x: 0, y: 12)
                     }
                     
                     VStack(spacing: 8) {
@@ -127,7 +174,6 @@ struct AuthenticationView: View {
                                     endPoint: .bottom
                                 )
                             )
-                            .tracking(4)
                             .shadow(color: Color(.sRGB, red: 0.7, green: 0.4, blue: 0.9).opacity(0.3), radius: 20, x: 0, y: 10)
                         
                         Text("Random Video Chat")
@@ -142,9 +188,7 @@ struct AuthenticationView: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .tracking(2.2)
                     }
->>>>>>> fefefa2 (Initial Commit)
                 }
                 .padding(.top, 100)
                 
@@ -166,26 +210,11 @@ struct AuthenticationView: View {
                 .frame(height: 55)
                 .padding(.horizontal, 40)
                 
-<<<<<<< HEAD
-                // 개발용 테스트 버튼
-=======
                 // Modern start button with glassmorphism
->>>>>>> fefefa2 (Initial Commit)
                 Button(action: {
                     print("익명 로그인 시도")
                     signInAnonymously()
                 }) {
-<<<<<<< HEAD
-                    Text("시작하기")  // 텍스트도 변경
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal, 40)
-                .padding(.top, 20)
-=======
                     HStack(spacing: 12) {
                         ZStack {
                             Image(systemName: "play.fill")
@@ -200,7 +229,6 @@ struct AuthenticationView: View {
                         
                         Text("시작하기")
                             .font(.system(size: 19, weight: .bold, design: .rounded))
-                            .tracking(1.2)
                             .foregroundStyle(Color.white)
                     }
                     .padding(.vertical, 18)
@@ -241,7 +269,6 @@ struct AuthenticationView: View {
                 }
                 .padding(.horizontal, 40)
                 .padding(.top, 25)
->>>>>>> fefefa2 (Initial Commit)
             }
             
             // 로딩 인디케이터
@@ -260,10 +287,10 @@ struct AuthenticationView: View {
     func signInAnonymously() {
         isLoading = true
         
-        Auth.auth().signInAnonymously { authResult, error in  // [weak self] 제거!
+        Auth.auth().signInAnonymously { authResult, error in
             if let error = error {
                 print("❌ 익명 로그인 실패: \(error)")
-                self.isLoading = false  // self?가 아닌 self 사용
+                self.isLoading = false
                 return
             }
             
@@ -275,8 +302,8 @@ struct AuthenticationView: View {
                 UserManager.shared.loadCurrentUser(uid: user.uid)
             }
             
-            self.isAuthenticated = true  // self?가 아닌 self 사용
-            self.isLoading = false       // self?가 아닌 self 사용
+            self.isAuthenticated = true
+            self.isLoading = false
         }
     }
     
