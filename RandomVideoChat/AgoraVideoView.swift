@@ -35,7 +35,11 @@ struct AgoraVideoView: UIViewRepresentable {
             print("📹 원격 비디오 뷰 업데이트: \(agoraManager.remoteUserJoined ? "연결됨" : "대기중")")
         }
         
-        if let videoView = videoView {
+        // 카메라가 꺼져있는지 확인
+        let shouldShowProfile = (isLocal && agoraManager.isCameraOff) || 
+                               (!isLocal && agoraManager.remoteUserJoined && !agoraManager.remoteVideoEnabled)
+        
+        if let videoView = videoView, !shouldShowProfile {
             containerView.addSubview(videoView)
             videoView.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
@@ -45,18 +49,49 @@ struct AgoraVideoView: UIViewRepresentable {
                 videoView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
             ])
         } else {
-            // 비디오가 없을 때 플레이스홀더 표시
-            let placeholderLabel = UILabel()
-            placeholderLabel.text = isLocal ? "카메라 준비중..." : "상대방 대기중..."
-            placeholderLabel.textColor = .white
-            placeholderLabel.textAlignment = .center
-            placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
+            // 비디오가 없거나 카메라가 꺼진 상태일 때 프로필 화면 표시
+            let profileView = UIView()
+            profileView.backgroundColor = .black
+            profileView.translatesAutoresizingMaskIntoConstraints = false
             
-            containerView.addSubview(placeholderLabel)
+            // 프로필 아이콘 추가
+            let profileIcon = UIImageView()
+            let personImage = UIImage(systemName: "person.crop.circle.fill")
+            profileIcon.image = personImage
+            profileIcon.tintColor = UIColor.white.withAlphaComponent(0.5)
+            profileIcon.contentMode = .scaleAspectFit
+            profileIcon.translatesAutoresizingMaskIntoConstraints = false
+            
+            containerView.addSubview(profileView)
+            profileView.addSubview(profileIcon)
+            
             NSLayoutConstraint.activate([
-                placeholderLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-                placeholderLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor)
+                profileView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                profileView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                profileView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                profileView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+                
+                profileIcon.centerXAnchor.constraint(equalTo: profileView.centerXAnchor),
+                profileIcon.centerYAnchor.constraint(equalTo: profileView.centerYAnchor),
+                profileIcon.widthAnchor.constraint(equalTo: profileView.widthAnchor, multiplier: 0.3),
+                profileIcon.heightAnchor.constraint(equalTo: profileIcon.widthAnchor)
             ])
+            
+            // 텍스트 레이블 추가 (원격 사용자가 아직 연결되지 않은 경우만)
+            if !isLocal && videoView == nil {
+                let placeholderLabel = UILabel()
+                placeholderLabel.text = "상대방 대기중..."
+                placeholderLabel.textColor = .white
+                placeholderLabel.textAlignment = .center
+                placeholderLabel.font = UIFont.systemFont(ofSize: 14)
+                placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
+                
+                profileView.addSubview(placeholderLabel)
+                NSLayoutConstraint.activate([
+                    placeholderLabel.centerXAnchor.constraint(equalTo: profileView.centerXAnchor),
+                    placeholderLabel.topAnchor.constraint(equalTo: profileIcon.bottomAnchor, constant: 16)
+                ])
+            }
         }
     }
 }

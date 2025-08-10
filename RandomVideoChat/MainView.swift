@@ -54,10 +54,23 @@ struct MainView: View {
                     VStack(spacing: 12) {
                         Button(action: {
                             isCameraOn.toggle()
+                            // 카메라 상태를 UserDefaults에 저장
+                            UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
                         }) {
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white)
+                            ZStack {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white)
+                                
+                                // 카메라 꺼진 상태에서 사선 표시
+                                if !isCameraOn {
+                                    Rectangle()
+                                        .frame(width: 35, height: 2)
+                                        .foregroundColor(.red)
+                                        .rotationEffect(.degrees(45))
+                                        .offset(x: 0, y: -2)
+                                }
+                            }
                         }
                         
                         HStack(spacing: 4) {
@@ -162,6 +175,14 @@ struct MainView: View {
                   secondaryButton: .cancel(Text("닫기")))
         }
         .onAppear {
+            // 저장된 카메라 상태 복원
+            isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
+            // 기본값이 false이므로 한번도 설정하지 않았다면 true로 설정
+            if UserDefaults.standard.object(forKey: "isCameraOn") == nil {
+                isCameraOn = true
+                UserDefaults.standard.set(true, forKey: "isCameraOn")
+            }
+            
             // 권한 요청
             checkPermissions()
             requestPermissions()

@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import FirebaseDatabase
 import FirebaseAuth
 
@@ -14,7 +15,42 @@ class MatchingManager: ObservableObject {
     @Published var matchedUserId: String?
     @Published var isMatched = false
     
-    private init() {}
+    private init() {
+        setupPresenceTracking()
+    }
+    
+    // MARK: - Presence Tracking
+    private func setupPresenceTracking() {
+        // 앱이 백그라운드로 가거나 종료될 때 처리
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillTerminate),
+            name: UIApplication.willTerminateNotification,
+            object: nil
+        )
+        
+        // 백그라운드 처리는 VideoCallView에서만 담당하도록 제거
+    }
+    
+    @objc private func appWillTerminate() {
+        print("🚨 앱 종료 감지 - 통화 종료 신호 전송")
+        signalCallEnd()
+        cleanupOnDisconnect()
+    }
+    
+    // 백그라운드 처리는 VideoCallView에서만 담당하도록 이 메서드들 제거
+    
+    private func cleanupOnDisconnect() {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        
+        // 매칭 큐에서 제거
+        removeFromQueue(userId: currentUserId)
+        
+        // 매칭 상태 정리
+        if let matchId = UserDefaults.standard.string(forKey: "currentMatchId") {
+            database.reference().child("matches").child(matchId).child("status").setValue("ended")
+        }
+    }
     
     // MARK: - Public Methods
     // MARK: - Public Methods 섹션에 추가
@@ -57,8 +93,31 @@ class MatchingManager: ObservableObject {
                 return
             }
             print("매칭 큐에 추가됨")
+            
+            // onDisconnect 설정 - 연결이 끊어지면 자동으로 큐에서 제거
+            userRef.onDisconnectRemoveValue()
+            
             self.startObserving()
         }
+        
+        // presence 추적 설정
+        setupPresenceForUser(userId: currentUserId)
+    }
+    
+    private func setupPresenceForUser(userId: String) {
+        let presenceRef = database.reference().child("presence").child(userId)
+        
+        // 온라인 상태 설정
+        presenceRef.setValue([
+            "online": true,
+            "lastSeen": ServerValue.timestamp()
+        ])
+        
+        // 연결 끊김 시 오프라인 상태로 설정
+        presenceRef.onDisconnectUpdateChildValues([
+            "online": false,
+            "lastSeen": ServerValue.timestamp()
+        ])
     }
 
     
@@ -369,7 +428,6 @@ class MatchingManager: ObservableObject {
     
     func signalCallEnd() {
             guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
-                print("❌ matchId가 없어서 통화 종료 신호를 보낼 수 없음")
                 return
             }
             
@@ -383,64 +441,73 @@ class MatchingManager: ObservableObject {
             ]
             
             database.reference().updateChildValues(updates) { error, _ in
-                if let error = error {
-                    print("❌ 통화 종료 신호 전송 실패: \(error)")
-                } else {
-                    print("✅ 통화 종료 신호 전송 성공 - matchId: \(matchId)")
-                }
+                // Silent completion
             }
-        }
-
-    // MARK: - 통화 종료 관찰
-        func observeCallEnd(completion: @escaping () -> Void) {
-            guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
-                print("❌ matchId가 없어서 통화 종료를 관찰할 수 없음")
-                return
-            }
-            
-            let currentUserId = Auth.auth().currentUser?.uid ?? ""
-            
-            // 기존 옵저버 제거
-            if let handle = callEndHandle {
-                database.reference().removeObserver(withHandle: handle)
-            }
-            
-            // 상대방의 종료 신호 관찰
-            callEndHandle = database.reference()
-                .child("matches")
-                .child(matchId)
-                .child("endedBy")
-                .observe(.childAdded) { snapshot in
-                    let endedByUserId = snapshot.key
-                    
-                    // 자신이 아닌 다른 사용자가 종료한 경우
-                    if endedByUserId != currentUserId {
-                        print("📱 상대방(\(endedByUserId))이 통화 종료")
-                        completion()
-                        
-                        // 한 번 실행 후 옵저버 제거
-                        if let handle = self.callEndHandle {
-                            self.database.reference().removeObserver(withHandle: handle)
-                            self.callEndHandle = nil
-                        }
-                    }
-                }
-            
-            print("👀 통화 종료 옵저버 설정 완료 - matchId: \(matchId)")
         }
     
-    // MARK: - 옵저버 정리
-        func cleanupCallObservers() {
-            if let handle = callEndHandle {
-                database.reference().removeObserver(withHandle: handle)
-                callEndHandle = nil
-            }
+    func observeOpponentPresence(opponentId: String, onDisconnect: @escaping () -> Void) {
+        let presenceRef = database.reference().child("presence").child(opponentId)
+        
+        presenceRef.observe(.value) { snapshot in
+            guard let data = snapshot.value as? [String: Any],
+                  let isOnline = data["online"] as? Bool else { return }
             
-            if let handle = timerHandle {
-                database.reference().removeObserver(withHandle: handle)
-                timerHandle = nil
+            if !isOnline {
+                print("🚨 상대방 연결 끊김 감지")
+                onDisconnect()
             }
-            
-            print("🧹 통화 관련 옵저버 정리 완료")
         }
+    }
+    
+    // MARK: - 통화 종료 관찰
+    func observeCallEnd(completion: @escaping () -> Void) {
+        guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
+            print("❌ matchId가 없어서 통화 종료를 관찰할 수 없음")
+            return
+        }
+        
+        let currentUserId = Auth.auth().currentUser?.uid ?? ""
+        
+        // 기존 옵저버 제거
+        if let handle = callEndHandle {
+            database.reference().removeObserver(withHandle: handle)
+        }
+        
+        // 상대방의 종료 신호 관찰
+        callEndHandle = database.reference()
+            .child("matches")
+            .child(matchId)
+            .child("endedBy")
+            .observe(.childAdded) { snapshot in
+                let endedByUserId = snapshot.key
+                
+                // 자신이 아닌 다른 사용자가 종료한 경우
+                if endedByUserId != currentUserId {
+                    completion()
+                    
+                    // 한 번 실행 후 옵저버 제거
+                    if let handle = self.callEndHandle {
+                        self.database.reference().removeObserver(withHandle: handle)
+                        self.callEndHandle = nil
+                    }
+                }
+            }
+        
+        print("👀 통화 종료 옵저버 설정 완료 - matchId: \(matchId)")
+    }
+    
+    // MARK: - 옵저버 정리
+    func cleanupCallObservers() {
+        if let handle = callEndHandle {
+            database.reference().removeObserver(withHandle: handle)
+            callEndHandle = nil
+        }
+        
+        if let handle = timerHandle {
+            database.reference().removeObserver(withHandle: handle)
+            timerHandle = nil
+        }
+        
+        print("🧹 통화 관련 옵저버 정리 완료")
+    }
 }

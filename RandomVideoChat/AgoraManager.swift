@@ -12,6 +12,7 @@ class AgoraManager: NSObject, ObservableObject {
     // 상태 관리
     @Published var isInCall = false
     @Published var remoteUserJoined = false
+    @Published var remoteVideoEnabled = false  // 초기값을 false로 변경
     @Published var localVideoView: UIView?
     @Published var remoteVideoView: UIView?
     
@@ -22,11 +23,39 @@ class AgoraManager: NSObject, ObservableObject {
     
     // 오디오/비디오 상태
     private var isMuted = false
-    private var isCameraOff = false
+    @Published var isCameraOff = false
+    
+    // 백그라운드 상태 추적
+    private var isInBackground = false
     
     override init() {
         super.init()
         setupAgoraEngine()
+        setupBackgroundNotifications()
+    }
+    
+    private func setupBackgroundNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func appDidEnterBackground() {
+        isInBackground = true
+    }
+    
+    @objc private func appWillEnterForeground() {
+        isInBackground = false
     }
     
     // MARK: - Agora 엔진 설정
@@ -192,6 +221,7 @@ class AgoraManager: NSObject, ObservableObject {
         DispatchQueue.main.async {
             self.isInCall = false
             self.remoteUserJoined = false
+            self.remoteVideoEnabled = false
             self.remoteUserId = 0
             self.channelName = ""
         }
@@ -255,15 +285,21 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         DispatchQueue.main.async {
             self.remoteVideoView = view
             self.remoteUserJoined = true
+            self.remoteVideoEnabled = true  // 사용자 참가 시 비디오 활성화
         }
     }
     
     // 원격 사용자가 채널을 떠남
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
-        print("👤 원격 사용자 나감: \(uid), 이유: \(reason.rawValue)")
+        // 강제 종료나 네트워크 문제로 인한 종료인지 확인 (단, 백그라운드 상태가 아닐 때만)
+        if reason == .dropped && !isInBackground {
+            // MatchingManager에 통화 종료 신호 전송
+            MatchingManager.shared.signalCallEnd()
+        }
         
         DispatchQueue.main.async {
             self.remoteUserJoined = false
+            self.remoteVideoEnabled = false // 초기화
             self.remoteVideoView = nil
             self.remoteUserId = 0
         }
@@ -298,5 +334,23 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     // 경고 발생
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurWarning warningCode: AgoraWarningCode) {
         print("⚠️ Agora 경고: \(warningCode.rawValue)")
+    }
+    
+    // 원격 사용자의 비디오 상태 변경
+    func rtcEngine(_ engine: AgoraRtcEngineKit, remoteVideoStateChangedOfUid uid: UInt, state: AgoraVideoRemoteState, reason: AgoraVideoRemoteReason, elapsed: Int) {
+        print("📹 원격 비디오 상태 변경: UID \(uid), 상태: \(state.rawValue), 이유: \(reason.rawValue)")
+        
+        DispatchQueue.main.async {
+            switch state {
+            case .stopped, .frozen:
+                self.remoteVideoEnabled = false
+                print("   ➜ 원격 비디오 비활성화")
+            case .starting, .decoding:
+                self.remoteVideoEnabled = true
+                print("   ➜ 원격 비디오 활성화")
+            @unknown default:
+                break
+            }
+        }
     }
 }

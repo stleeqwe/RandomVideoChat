@@ -100,81 +100,21 @@ struct MatchingView: View {
                 Spacer()
                 
                 // 매칭 중 또는 매칭 완료 상태
-                if matchingManager.isMatched && !navigateToVideoCall {
+                if matchingManager.isMatched {
                     // Enhanced match success animation
                     VStack(spacing: 30) {
                         ZStack {
-                            // Multiple expanding rings
-                            ForEach(0..<4, id: \.self) { index in
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(.sRGB, red: 0.2, green: 0.8, blue: 0.4).opacity(0.6),
-                                                Color(.sRGB, red: 0.1, green: 0.9, blue: 0.5).opacity(0.3)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 3 - CGFloat(index) * 0.5
-                                    )
-                                    .frame(width: 80 + CGFloat(index * 25), height: 80 + CGFloat(index * 25))
-                                    .scaleEffect(showMatchedAnimation ? 2.0 + CGFloat(index) * 0.3 : 0)
-                                    .opacity(showMatchedAnimation ? 0 : 0.8 - Double(index) * 0.2)
-                                    .animation(
-                                        .easeOut(duration: 1.2)
-                                            .delay(Double(index) * 0.1),
-                                        value: showMatchedAnimation
-                                    )
-                            }
-                            
-                            // Main success icon with glow
-                            ZStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 80, weight: .medium))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(.sRGB, red: 0.2, green: 0.8, blue: 0.4),
-                                                Color(.sRGB, red: 0.1, green: 0.9, blue: 0.5)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .blur(radius: 8)
-                                    .opacity(0.7)
-                                
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 80, weight: .medium))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(.sRGB, red: 0.2, green: 0.8, blue: 0.4),
-                                                Color(.sRGB, red: 0.1, green: 0.9, blue: 0.5)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            }
+                            // Simple purple success icon
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 80, weight: .medium))
+                                .foregroundColor(Color(.sRGB, red: 0.6, green: 0.4, blue: 0.8))
                             .scaleEffect(showMatchedAnimation ? 1 : 0)
                             .animation(.spring(response: 0.6, dampingFraction: 0.5), value: showMatchedAnimation)
                         }
                         
                         Text("MATCHED!")
-                            .font(.system(size: 38, weight: .black, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white,
-                                        Color(.sRGB, red: 0.9, green: 1.0, blue: 0.9)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .shadow(color: Color(.sRGB, red: 0.2, green: 0.8, blue: 0.4).opacity(0.5), radius: 15, x: 0, y: 8)
+                            .font(.custom("Carter One", size: 38))
+                            .foregroundColor(.white)
                             .scaleEffect(showMatchedAnimation ? 1 : 0)
                             .animation(.spring(response: 0.7, dampingFraction: 0.6).delay(0.2), value: showMatchedAnimation)
                     }
