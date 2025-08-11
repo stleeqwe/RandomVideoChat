@@ -78,8 +78,7 @@ class UserManager: ObservableObject {
         }
     }
     
-    // MARK: - 하트 전송 개선
-    // UserManager.swift
+    // MARK: - Heart Notification System
     func sendHeartToOpponent(_ opponentId: String) {
         let ref = Database.database().reference()
             .child("notifications")
@@ -98,48 +97,16 @@ class UserManager: ObservableObject {
             }
         }
     }
-
     
-    // 사용자 문서가 없을 때 생성하고 하트 전송
-    private func createUserAndSendHeart(_ opponentId: String) {
-        print("⚠️ 상대방 문서가 없음. 새로 생성")
-        
-        let newData: [String: Any] = [
-            "uid": opponentId,
-            "heartCount": 4,  // 기본 3 + 받은 1
-            "blockedUsers": [],
-            "createdAt": Timestamp(date: Date()),
-            "lastHeartReceivedAt": Timestamp(date: Date())
-        ]
-        
-        db.collection("users").document(opponentId).setData(newData) { error in
-            if error == nil {
-                print("✅ 새 사용자 문서 생성 및 하트 전송 성공")
-            } else {
-                print("❌ 새 사용자 생성 실패: \(error?.localizedDescription ?? "")")
-            }
-        }
-    }
+    // MARK: - Real-time Heart Observation
+    private var heartListener: ListenerRegistration?
     
-    // 하트 알림 트리거 (Firebase에 알림 플래그 설정)
-    private func triggerHeartNotification(to userId: String) {
-        // Firebase Realtime Database에 알림 플래그 설정
-        Database.database().reference()
-            .child("notifications")
-            .child(userId)
-            .child("newHeart")
-            .setValue([
-                "timestamp": ServerValue.timestamp(),
-                "from": Auth.auth().currentUser?.uid ?? "unknown"
-            ])
-        
-        print("🔔 하트 알림 트리거 완료")
-    }
-    
-    // MARK: - 하트 개수 실시간 관찰
     func observeUserHearts(uid: String, completion: @escaping (Int) -> Void) {
-        db.collection("users").document(uid)
-            .addSnapshotListener { documentSnapshot, error in
+        // 기존 리스너 정리
+        heartListener?.remove()
+        
+        heartListener = db.collection("users").document(uid)
+            .addSnapshotListener { [weak self] documentSnapshot, error in
                 guard let document = documentSnapshot,
                       let data = document.data(),
                       let heartCount = data["heartCount"] as? Int else {
@@ -150,6 +117,11 @@ class UserManager: ObservableObject {
                 completion(heartCount)
                 print("👀 하트 개수 실시간 업데이트: \(heartCount)")
             }
+    }
+    
+    func stopObservingHearts() {
+        heartListener?.remove()
+        heartListener = nil
     }
     
     // MARK: - Block Management
@@ -213,18 +185,17 @@ class UserManager: ObservableObject {
     }
     
     // MARK: - Recent Matches (Session-based)
+    private static let maxRecentMatches = 5
+    
     func addRecentMatch(_ userId: String) {
         recentMatches.insert(userId)
         print("📝 세션 매칭 기록 추가: \(userId)")
         print("📊 현재 세션 매칭 기록: \(recentMatches.count)명")
         
         // 최근 5명만 유지 (메모리 관리)
-        if recentMatches.count > 5 {
-            // Set은 순서가 없으므로 배열로 변환 후 처리
-            let sortedMatches = Array(recentMatches)
-            if sortedMatches.count > 5 {
-                recentMatches = Set(sortedMatches.suffix(5))
-            }
+        if recentMatches.count > Self.maxRecentMatches {
+            let matchesArray = Array(recentMatches)
+            recentMatches = Set(matchesArray.suffix(Self.maxRecentMatches))
         }
     }
     

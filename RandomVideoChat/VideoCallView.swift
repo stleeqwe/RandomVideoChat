@@ -229,78 +229,7 @@ struct VideoCallView: View {
 
         }
         .onAppear {
-            // 메인화면에서 설정한 카메라 상태 복원
-            isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
-            // 기본값이 false이므로 한번도 설정하지 않았다면 true로 설정
-            if UserDefaults.standard.object(forKey: "isCameraOn") == nil {
-                isCameraOn = true
-                UserDefaults.standard.set(true, forKey: "isCameraOn")
-            }
-            
-            startVideoCall()
-            
-            // Agora 카메라 상태도 동기화
-            if !isCameraOn {
-                _ = AgoraManager.shared.toggleCamera()
-            }
-
-            // 사용자 데이터 로드 및 하트 관찰
-            if let uid = Auth.auth().currentUser?.uid {
-                userManager.loadCurrentUser(uid: uid)
-                observeHeartCount(uid: uid)
-                observeNewHeartNotification()
-                if let currentHeartCount = userManager.currentUser?.heartCount {
-                    heartCount = currentHeartCount
-                }
-            }
-
-            // 매칭된 상대방 ID 저장
-            if let matchedUserId = MatchingManager.shared.matchedUserId {
-                opponentUserId = matchedUserId
-                UserManager.shared.addRecentMatch(matchedUserId)
-                
-                // 상대방 presence 감시 시작
-                MatchingManager.shared.observeOpponentPresence(opponentId: matchedUserId) {
-                    // 상대방 연결 끊김 감지시 통화 종료 (단, 백그라운드 상태가 아닐 때만)
-                    DispatchQueue.main.async {
-                        print("🔍 상대방 연결 끊김 감지됨 - 백그라운드 상태: \(self.isBackground), 종료 중: \(self.isCallEnding)")
-                        guard !self.isCallEnding && !self.isBackground else { 
-                            print("⏸ 통화 종료 건너뜀 (백그라운드이거나 이미 종료 중)")
-                            return 
-                        }
-                        print("🛑 상대방 연결 끊김으로 인한 통화 종료")
-                        self.endVideoCall()
-                    }
-                }
-            }
-
-            // 타이머 동기화 관찰
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                MatchingManager.shared.observeCallTimer { syncedTime in
-                    if syncedTime > timeRemaining {
-                        timeRemaining = syncedTime
-                        if isTimerStarted {
-                            startTimer()
-                        }
-                    }
-                }
-            }
-            
-            // 통화 종료 관찰
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                MatchingManager.shared.observeCallEnd {
-                    guard !isCallEnding else { 
-                        return 
-                    }
-                    isCallEnding = true
-                    timer?.invalidate()
-                    AgoraManager.shared.endCall()
-                    MatchingManager.shared.cancelMatching()
-                    MatchingManager.shared.cleanupCallObservers()
-                    // 바로 매칭 화면으로 이동
-                    presentationMode.wrappedValue.dismiss()
-                }
-            }
+            setupVideoCall()
         }
         .onChange(of: agoraManager.remoteUserJoined) { joined in
             if joined && !isTimerStarted {
@@ -376,30 +305,25 @@ struct VideoCallView: View {
     }
     
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
-        print("📱 scenePhase 변경: \(newPhase) (이전 백그라운드 상태: \(isBackground))")
-        
-        if newPhase == .background {
-            print("🔄 백그라운드 진입 - 5초 지연 타이머 시작")
+        if newPhase == .background || newPhase == .inactive {
             isBackground = true
+            
+            // 기존 타이머가 있다면 취소 후 새로 시작
+            backgroundTerminationWorkItem?.cancel()
             
             // 5초 후 통화 종료를 예약
             let workItem = DispatchWorkItem {
-                print("⏰ 백그라운드 5초 경과 - 통화 종료 실행")
                 if self.isBackground && !self.isCallEnding {
                     self.endVideoCall()
-                    // 콜 동기화 옵저버 및 UserDefaults 정리
                     self.cleanupCallSyncObservers()
                     UserDefaults.standard.removeObject(forKey: "currentChannelName")
                     UserDefaults.standard.removeObject(forKey: "currentMatchId")
-                } else {
-                    print("⏰ 백그라운드 타이머 실행되었지만 조건 불충족 (백그라운드: \(self.isBackground), 종료중: \(self.isCallEnding))")
                 }
             }
             backgroundTerminationWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
             
         } else if newPhase == .active {
-            print("🔄 앱 활성화 - 백그라운드 타이머 취소")
             // 앱이 다시 활성화되면 예약된 작업 취소
             isBackground = false
             backgroundTerminationWorkItem?.cancel()
@@ -441,7 +365,85 @@ struct VideoCallView: View {
             }
     }
 
-    // MARK: - Video Call Functions
+    // MARK: - Video Call Setup and Management
+    private func setupVideoCall() {
+        setupCameraState()
+        startVideoCall()
+        setupUserData()
+        setupOpponentObservation()
+        setupCallObservers()
+    }
+    
+    private func setupCameraState() {
+        // 메인화면에서 설정한 카메라 상태 복원
+        isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
+        // 기본값이 false이므로 한번도 설정하지 않았다면 true로 설정
+        if UserDefaults.standard.object(forKey: "isCameraOn") == nil {
+            isCameraOn = true
+            UserDefaults.standard.set(true, forKey: "isCameraOn")
+        }
+        
+        // Agora 카메라 상태도 동기화
+        if !isCameraOn {
+            _ = AgoraManager.shared.toggleCamera()
+        }
+    }
+    
+    private func setupUserData() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        
+        userManager.loadCurrentUser(uid: uid)
+        observeHeartCount(uid: uid)
+        observeNewHeartNotification()
+        
+        if let currentHeartCount = userManager.currentUser?.heartCount {
+            heartCount = currentHeartCount
+        }
+    }
+    
+    private func setupOpponentObservation() {
+        guard let matchedUserId = MatchingManager.shared.matchedUserId else { return }
+        
+        opponentUserId = matchedUserId
+        UserManager.shared.addRecentMatch(matchedUserId)
+        
+        // 상대방 presence 감시 시작
+        MatchingManager.shared.observeOpponentPresence(opponentId: matchedUserId) {
+            DispatchQueue.main.async {
+                guard !isCallEnding && !isBackground else { return }
+                endVideoCall()
+            }
+        }
+    }
+    
+    private func setupCallObservers() {
+        // 타이머 동기화 관찰
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            MatchingManager.shared.observeCallTimer { syncedTime in
+                if syncedTime > timeRemaining {
+                    timeRemaining = syncedTime
+                    if isTimerStarted {
+                        startTimer()
+                    }
+                }
+            }
+        }
+        
+        // 통화 종료 관찰
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            MatchingManager.shared.observeCallEnd {
+                guard !isCallEnding else { return }
+                
+                isCallEnding = true
+                timer?.invalidate()
+                AgoraManager.shared.endCall()
+                MatchingManager.shared.cancelMatching()
+                MatchingManager.shared.cleanupCallObservers()
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
+    }
+    
     func startVideoCall() {
         isCallActive = true
         if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {

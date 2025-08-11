@@ -6,10 +6,13 @@ import FirebaseAuth
 class MatchingManager: ObservableObject {
     static let shared = MatchingManager()
     private let database = Database.database()
+    
+    // MARK: - Database Handles
     private var matchingHandle: DatabaseHandle?
     private var statusHandle: DatabaseHandle?
     private var callEndHandle: DatabaseHandle?
     private var timerHandle: DatabaseHandle?
+    private var presenceHandle: DatabaseHandle?
     
     @Published var isMatching = false
     @Published var matchedUserId: String?
@@ -446,16 +449,39 @@ class MatchingManager: ObservableObject {
         }
     
     func observeOpponentPresence(opponentId: String, onDisconnect: @escaping () -> Void) {
+        // 기존 리스너 정리
+        cleanupPresenceObserver()
+        
         let presenceRef = database.reference().child("presence").child(opponentId)
         
-        presenceRef.observe(.value) { snapshot in
+        presenceHandle = presenceRef.observe(.value) { [weak self] snapshot in
             guard let data = snapshot.value as? [String: Any],
                   let isOnline = data["online"] as? Bool else { return }
             
             if !isOnline {
-                print("🚨 상대방 연결 끊김 감지")
-                onDisconnect()
+                print("🚨 상대방 연결 끊김 감지 - 6초 지연 후 처리")
+                // 6초 지연을 두어 상대방이 백그라운드에서 복귀할 시간을 줌
+                DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+                    // 6초 후에도 여전히 offline이면 통화 종료
+                    presenceRef.observeSingleEvent(of: .value) { delayedSnapshot in
+                        if let delayedData = delayedSnapshot.value as? [String: Any],
+                           let delayedIsOnline = delayedData["online"] as? Bool,
+                           !delayedIsOnline {
+                            print("🚨 6초 후에도 상대방 연결 끊김 확인 - 통화 종료")
+                            onDisconnect()
+                        } else {
+                            print("✅ 상대방이 다시 연결됨 - 통화 유지")
+                        }
+                    }
+                }
             }
+        }
+    }
+    
+    private func cleanupPresenceObserver() {
+        if let handle = presenceHandle {
+            database.reference().removeObserver(withHandle: handle)
+            presenceHandle = nil
         }
     }
     
@@ -496,18 +522,26 @@ class MatchingManager: ObservableObject {
         print("👀 통화 종료 옵저버 설정 완료 - matchId: \(matchId)")
     }
     
-    // MARK: - 옵저버 정리
+    // MARK: - Observer Cleanup
     func cleanupCallObservers() {
+        cleanupCallEndObserver()
+        cleanupTimerObserver()
+        cleanupPresenceObserver()
+        
+        print("🧹 통화 관련 옵저버 정리 완료")
+    }
+    
+    private func cleanupCallEndObserver() {
         if let handle = callEndHandle {
             database.reference().removeObserver(withHandle: handle)
             callEndHandle = nil
         }
-        
+    }
+    
+    private func cleanupTimerObserver() {
         if let handle = timerHandle {
             database.reference().removeObserver(withHandle: handle)
             timerHandle = nil
         }
-        
-        print("🧹 통화 관련 옵저버 정리 완료")
     }
 }
