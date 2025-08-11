@@ -263,7 +263,12 @@ struct VideoCallView: View {
                 MatchingManager.shared.observeOpponentPresence(opponentId: matchedUserId) {
                     // 상대방 연결 끊김 감지시 통화 종료 (단, 백그라운드 상태가 아닐 때만)
                     DispatchQueue.main.async {
-                        guard !self.isCallEnding && !self.isBackground else { return }
+                        print("🔍 상대방 연결 끊김 감지됨 - 백그라운드 상태: \(self.isBackground), 종료 중: \(self.isCallEnding)")
+                        guard !self.isCallEnding && !self.isBackground else { 
+                            print("⏸ 통화 종료 건너뜀 (백그라운드이거나 이미 종료 중)")
+                            return 
+                        }
+                        print("🛑 상대방 연결 끊김으로 인한 통화 종료")
                         self.endVideoCall()
                     }
                 }
@@ -371,21 +376,30 @@ struct VideoCallView: View {
     }
     
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        print("📱 scenePhase 변경: \(newPhase) (이전 백그라운드 상태: \(isBackground))")
+        
         if newPhase == .background {
+            print("🔄 백그라운드 진입 - 5초 지연 타이머 시작")
             isBackground = true
+            
             // 5초 후 통화 종료를 예약
             let workItem = DispatchWorkItem {
+                print("⏰ 백그라운드 5초 경과 - 통화 종료 실행")
                 if self.isBackground && !self.isCallEnding {
                     self.endVideoCall()
                     // 콜 동기화 옵저버 및 UserDefaults 정리
                     self.cleanupCallSyncObservers()
                     UserDefaults.standard.removeObject(forKey: "currentChannelName")
                     UserDefaults.standard.removeObject(forKey: "currentMatchId")
+                } else {
+                    print("⏰ 백그라운드 타이머 실행되었지만 조건 불충족 (백그라운드: \(self.isBackground), 종료중: \(self.isCallEnding))")
                 }
             }
             backgroundTerminationWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+            
         } else if newPhase == .active {
+            print("🔄 앱 활성화 - 백그라운드 타이머 취소")
             // 앱이 다시 활성화되면 예약된 작업 취소
             isBackground = false
             backgroundTerminationWorkItem?.cancel()
