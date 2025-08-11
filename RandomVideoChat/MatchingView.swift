@@ -11,6 +11,7 @@ struct MatchingView: View {
     @State private var showMatchedAnimation = false
     @State private var swipeOffset: CGFloat = 0
     @State private var showSwipeHint = true
+    @State private var dotTimer: Timer?
     
     var body: some View {
         ZStack {
@@ -99,8 +100,8 @@ struct MatchingView: View {
             VStack {
                 Spacer()
                 
-                // 매칭 중 또는 매칭 완료 상태
-                if matchingManager.isMatched {
+                // 매칭 중 또는 매칭 완료 상태 (VideoCall로 이동하지 않은 경우에만, 상대방에 의해 종료되지 않은 경우에만)
+                if matchingManager.isMatched && !navigateToVideoCall && !matchingManager.callEndedByOpponent {
                     // Enhanced match success animation
                     VStack(spacing: 30) {
                         ZStack {
@@ -127,7 +128,7 @@ struct MatchingView: View {
                             navigateToVideoCall = true
                         }
                     }
-                } else {
+                } else if !navigateToVideoCall {
                     // 로딩 인디케이터
                     VStack(spacing: 30) {
                         ProgressView()
@@ -157,18 +158,14 @@ struct MatchingView: View {
                         }
                     }
                     .onAppear {
-                        Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { _ in
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                dotCount = (dotCount + 1) % 4
-                            }
-                        }
+                        startDotAnimation()
                     }
                 }
                 
                 Spacer()
                 
                 // 인터랙티브 하향 스와이프 인디케이터
-                if !matchingManager.isMatched {
+                if !matchingManager.isMatched && !navigateToVideoCall {
                     VStack(spacing: 16) {
                         VStack(spacing: 6) {
                             ForEach(0..<3, id: \.self) { index in
@@ -227,7 +224,26 @@ struct MatchingView: View {
             startMatchingIfNeeded()
             pulseAnimation = true
         }
-        .fullScreenCover(isPresented: $navigateToVideoCall) {
+        .onDisappear {
+            stopDotAnimation()
+        }
+        .onChange(of: matchingManager.isMatched) { isMatched in
+            if !isMatched && navigateToVideoCall {
+                // 매칭이 취소되었는데 VideoCall이 활성화되어 있다면 즉시 리셋
+                navigateToVideoCall = false
+                showMatchedAnimation = false
+            }
+        }
+        .onChange(of: matchingManager.callEndedByOpponent) { endedByOpponent in
+            if endedByOpponent {
+                // 상대방에 의해 통화가 종료된 경우 즉시 상태 리셋
+                navigateToVideoCall = false
+                showMatchedAnimation = false
+            }
+        }
+        .fullScreenCover(isPresented: $navigateToVideoCall, onDismiss: {
+            resetMatchingState()
+        }) {
             VideoCallView()
         }
     }
@@ -237,4 +253,30 @@ struct MatchingView: View {
             matchingManager.startMatching()
         }
     }
+    
+    private func startDotAnimation() {
+        stopDotAnimation() // 기존 타이머가 있으면 정리
+        dotTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                dotCount = (dotCount + 1) % 4
+            }
+        }
+    }
+    
+    private func stopDotAnimation() {
+        dotTimer?.invalidate()
+        dotTimer = nil
+    }
+    
+    private func resetMatchingState() {
+        // VideoCallView가 dismiss될 때 상태 리셋
+        navigateToVideoCall = false
+        showMatchedAnimation = false
+        
+        // MatchingManager 상태도 확인하여 필요시 리셋
+        if matchingManager.isMatched && !matchingManager.isMatching {
+            matchingManager.cancelMatching()
+        }
+    }
+    
 }

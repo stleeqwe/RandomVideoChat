@@ -17,6 +17,7 @@ class MatchingManager: ObservableObject {
     @Published var isMatching = false
     @Published var matchedUserId: String?
     @Published var isMatched = false
+    @Published var callEndedByOpponent = false
     
     private init() {
         setupPresenceTracking()
@@ -134,7 +135,6 @@ class MatchingManager: ObservableObject {
         // UserDefaults에 저장 (중요!)
         UserDefaults.standard.set(channelName, forKey: "currentChannelName")
         UserDefaults.standard.set(matchId, forKey: "currentMatchId")
-        UserDefaults.standard.synchronize() // 즉시 저장
         
         self.matchedUserId = matchedUserId
         self.isMatched = true
@@ -148,6 +148,7 @@ class MatchingManager: ObservableObject {
         isMatching = false
         isMatched = false
         matchedUserId = nil
+        callEndedByOpponent = false
         
         // 리스너 제거
         if let handle = matchingHandle {
@@ -468,6 +469,7 @@ class MatchingManager: ObservableObject {
                            let delayedIsOnline = delayedData["online"] as? Bool,
                            !delayedIsOnline {
                             print("🚨 6초 후에도 상대방 연결 끊김 확인 - 통화 종료")
+                            self?.callEndedByOpponent = true
                             onDisconnect()
                         } else {
                             print("✅ 상대방이 다시 연결됨 - 통화 유지")

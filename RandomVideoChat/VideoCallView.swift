@@ -251,6 +251,26 @@ struct VideoCallView: View {
     
     private func handleAppTermination() {
         guard !isCallEnding else { return }
+        cleanupAfterCallEnd(signalEnd: true)
+    }
+    
+    private func onDisappearTasks() {
+        // 백그라운드로 이동했다면 즉시 종료하지 않음
+        if isBackground {
+            return
+        }
+        
+        cleanupAfterCallEnd(signalEnd: true)
+    }
+    
+    private func cleanupCallSyncObservers() {
+        // 기존 MatchingManager의 cleanupCallObservers와 중복되지 않는 추가 정리 작업
+        // 현재는 MatchingManager에서 대부분 처리하므로 빈 함수로 둠
+    }
+    
+    // MARK: - 통합된 정리 함수
+    private func cleanupAfterCallEnd(signalEnd: Bool) {
+        guard !isCallEnding else { return }
         
         isCallEnding = true
         
@@ -258,8 +278,11 @@ struct VideoCallView: View {
         backgroundTerminationWorkItem?.cancel()
         backgroundTerminationWorkItem = nil
         
-        // 통화 종료 신호 전송
-        MatchingManager.shared.signalCallEnd()
+        // 통화 종료 신호 전송 (필요한 경우에만)
+        if signalEnd {
+            MatchingManager.shared.signalCallEnd()
+            MatchingManager.shared.cancelMatching()
+        }
         
         // 타이머 정리
         timer?.invalidate()
@@ -269,39 +292,11 @@ struct VideoCallView: View {
         
         // Firebase 리스너 정리
         MatchingManager.shared.cleanupCallObservers()
+        cleanupCallSyncObservers()
         
         // UserDefaults 정리
         UserDefaults.standard.removeObject(forKey: "currentChannelName")
         UserDefaults.standard.removeObject(forKey: "currentMatchId")
-    }
-    
-    private func onDisappearTasks() {
-        // 백그라운드로 이동했다면 즉시 종료하지 않음
-        if isBackground {
-            return
-        }
-        
-        // 종료 신호 송신
-        if !isCallEnding {
-            isCallEnding = true
-            MatchingManager.shared.signalCallEnd()
-        }
-        
-        timer?.invalidate()
-        AgoraManager.shared.endCall()
-        MatchingManager.shared.cleanupCallObservers()
-        cleanupCallSyncObservers()
-        UserDefaults.standard.removeObject(forKey: "currentChannelName")
-        UserDefaults.standard.removeObject(forKey: "currentMatchId")
-        
-        // 예약된 백그라운드 작업도 취소
-        backgroundTerminationWorkItem?.cancel()
-        backgroundTerminationWorkItem = nil
-    }
-    
-    private func cleanupCallSyncObservers() {
-        // 기존 MatchingManager의 cleanupCallObservers와 중복되지 않는 추가 정리 작업
-        // 현재는 MatchingManager에서 대부분 처리하므로 빈 함수로 둠
     }
     
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
@@ -314,10 +309,8 @@ struct VideoCallView: View {
             // 5초 후 통화 종료를 예약
             let workItem = DispatchWorkItem {
                 if self.isBackground && !self.isCallEnding {
-                    self.endVideoCall()
-                    self.cleanupCallSyncObservers()
-                    UserDefaults.standard.removeObject(forKey: "currentChannelName")
-                    UserDefaults.standard.removeObject(forKey: "currentMatchId")
+                    self.cleanupAfterCallEnd(signalEnd: true)
+                    self.presentationMode.wrappedValue.dismiss()
                 }
             }
             backgroundTerminationWorkItem = workItem
@@ -433,12 +426,7 @@ struct VideoCallView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             MatchingManager.shared.observeCallEnd {
                 guard !isCallEnding else { return }
-                
-                isCallEnding = true
-                timer?.invalidate()
-                AgoraManager.shared.endCall()
-                MatchingManager.shared.cancelMatching()
-                MatchingManager.shared.cleanupCallObservers()
+                cleanupAfterCallEnd(signalEnd: false) // 이미 다른 사용자가 종료했으므로 중복 신호 방지
                 presentationMode.wrappedValue.dismiss()
             }
         }
@@ -464,15 +452,7 @@ struct VideoCallView: View {
     }
 
     func endVideoCall() {
-        if !isCallEnding {
-            isCallEnding = true
-            MatchingManager.shared.signalCallEnd()
-            MatchingManager.shared.cancelMatching()
-        }
-        timer?.invalidate()
-        AgoraManager.shared.endCall()
-        MatchingManager.shared.cleanupCallObservers()
-        // 바로 매칭 화면으로 이동
+        cleanupAfterCallEnd(signalEnd: true)
         presentationMode.wrappedValue.dismiss()
     }
 
