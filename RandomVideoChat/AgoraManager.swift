@@ -25,37 +25,9 @@ class AgoraManager: NSObject, ObservableObject {
     private var isMuted = false
     @Published var isCameraOff = false
     
-    // 백그라운드 상태 추적
-    private var isInBackground = false
-    
     override init() {
         super.init()
         setupAgoraEngine()
-        setupBackgroundNotifications()
-    }
-    
-    private func setupBackgroundNotifications() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appDidEnterBackground),
-            name: UIApplication.didEnterBackgroundNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appWillEnterForeground),
-            name: UIApplication.willEnterForegroundNotification,
-            object: nil
-        )
-    }
-    
-    @objc private func appDidEnterBackground() {
-        isInBackground = true
-    }
-    
-    @objc private func appWillEnterForeground() {
-        isInBackground = false
     }
     
     // MARK: - Agora 엔진 설정
@@ -291,8 +263,8 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     
     // 원격 사용자가 채널을 떠남
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
-        // 강제 종료나 네트워크 문제로 인한 종료인지 확인 (단, 백그라운드 상태가 아닐 때만)
-        if reason == .dropped && !isInBackground {
+        // 강제 종료나 네트워크 문제로 인한 종료인지 확인
+        if reason == .dropped {
             // MatchingManager에 통화 종료 신호 전송
             MatchingManager.shared.signalCallEnd()
         }

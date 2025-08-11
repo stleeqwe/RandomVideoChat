@@ -19,8 +19,11 @@ struct VideoCallView: View {
     @State private var showHeartAnimation = false
     @State private var isCameraOn = true
     @State private var heartCountAnimation = false
-    @State private var backgroundTimer: Timer?
-    @State private var isInBackground = false
+    
+    // 앱 상태 및 백그라운드 감지를 위한 프로퍼티
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isBackground = false
+    @State private var backgroundTerminationWorkItem: DispatchWorkItem?
 
     @StateObject private var userManager = UserManager.shared
     @StateObject private var agoraManager = AgoraManager.shared
@@ -260,7 +263,7 @@ struct VideoCallView: View {
                 MatchingManager.shared.observeOpponentPresence(opponentId: matchedUserId) {
                     // 상대방 연결 끊김 감지시 통화 종료 (단, 백그라운드 상태가 아닐 때만)
                     DispatchQueue.main.async {
-                        guard !self.isCallEnding && !self.isInBackground else { return }
+                        guard !self.isCallEnding && !self.isBackground else { return }
                         self.endVideoCall()
                     }
                 }
@@ -304,34 +307,11 @@ struct VideoCallView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
             handleAppTermination()
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-            isInBackground = true
-            handleAppBackground()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            isInBackground = false
-            handleAppForeground()
+        .onChange(of: scenePhase) { newPhase in
+            handleScenePhaseChange(newPhase)
         }
         .onDisappear {
-            // 백그라운드 상태에서 onDisappear가 호출된 경우는 무시
-            guard !isInBackground else {
-                return
-            }
-            
-            if !isCallEnding {
-                isCallEnding = true
-                MatchingManager.shared.signalCallEnd()
-            }
-            
-            // 백그라운드 타이머 정리
-            backgroundTimer?.invalidate()
-            backgroundTimer = nil
-            
-            timer?.invalidate()
-            AgoraManager.shared.endCall()
-            MatchingManager.shared.cleanupCallObservers()
-            UserDefaults.standard.removeObject(forKey: "currentChannelName")
-            UserDefaults.standard.removeObject(forKey: "currentMatchId")
+            onDisappearTasks()
         }
     }
     
@@ -340,9 +320,9 @@ struct VideoCallView: View {
         
         isCallEnding = true
         
-        // 백그라운드 타이머 취소
-        backgroundTimer?.invalidate()
-        backgroundTimer = nil
+        // 예약된 백그라운드 작업 취소
+        backgroundTerminationWorkItem?.cancel()
+        backgroundTerminationWorkItem = nil
         
         // 통화 종료 신호 전송
         MatchingManager.shared.signalCallEnd()
@@ -361,31 +341,56 @@ struct VideoCallView: View {
         UserDefaults.standard.removeObject(forKey: "currentMatchId")
     }
     
-    private func handleAppBackground() {
-        // 이미 통화가 종료 중이면 타이머 설정하지 않음
-        guard !isCallEnding else {
+    private func onDisappearTasks() {
+        // 백그라운드로 이동했다면 즉시 종료하지 않음
+        if isBackground {
             return
         }
         
-        // 기존 타이머 취소
-        backgroundTimer?.invalidate()
-        
-        // 5초 후 통화 종료하는 타이머 시작
-        backgroundTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-            DispatchQueue.main.async {
-                guard !self.isCallEnding else {
-                    return
-                }
-                self.handleAppTermination()
-                self.presentationMode.wrappedValue.dismiss()
-            }
+        // 종료 신호 송신
+        if !isCallEnding {
+            isCallEnding = true
+            MatchingManager.shared.signalCallEnd()
         }
+        
+        timer?.invalidate()
+        AgoraManager.shared.endCall()
+        MatchingManager.shared.cleanupCallObservers()
+        cleanupCallSyncObservers()
+        UserDefaults.standard.removeObject(forKey: "currentChannelName")
+        UserDefaults.standard.removeObject(forKey: "currentMatchId")
+        
+        // 예약된 백그라운드 작업도 취소
+        backgroundTerminationWorkItem?.cancel()
+        backgroundTerminationWorkItem = nil
     }
     
-    private func handleAppForeground() {
-        // 백그라운드 종료 타이머 취소
-        backgroundTimer?.invalidate()
-        backgroundTimer = nil
+    private func cleanupCallSyncObservers() {
+        // 기존 MatchingManager의 cleanupCallObservers와 중복되지 않는 추가 정리 작업
+        // 현재는 MatchingManager에서 대부분 처리하므로 빈 함수로 둠
+    }
+    
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        if newPhase == .background {
+            isBackground = true
+            // 5초 후 통화 종료를 예약
+            let workItem = DispatchWorkItem {
+                if self.isBackground && !self.isCallEnding {
+                    self.endVideoCall()
+                    // 콜 동기화 옵저버 및 UserDefaults 정리
+                    self.cleanupCallSyncObservers()
+                    UserDefaults.standard.removeObject(forKey: "currentChannelName")
+                    UserDefaults.standard.removeObject(forKey: "currentMatchId")
+                }
+            }
+            backgroundTerminationWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+        } else if newPhase == .active {
+            // 앱이 다시 활성화되면 예약된 작업 취소
+            isBackground = false
+            backgroundTerminationWorkItem?.cancel()
+            backgroundTerminationWorkItem = nil
+        }
     }
 
     // MARK: - 하트 실시간 관찰
