@@ -350,19 +350,26 @@ class MatchingManager: ObservableObject {
                         }
                         
                         // 차단/최근매칭 제외
-                        if !UserManager.shared.canMatchWith(userId) { 
+                        let canMatch = UserManager.shared.canMatchWith(userId)
+                        print("   - canMatchWith 결과: \(canMatch)")
+                        if !canMatch { 
                             print("   ❌ 차단/최근매칭")
                             continue 
                         }
                         
-                        print("   ✅ 후보로 선정")
+                        print("   ✅ 후보로 선정 - candidates에 추가 중...")
                         dict["userId"] = userId
                         candidates.append(dict)
+                        print("   ✅ candidates 추가 완료, 현재 개수: \(candidates.count)")
                     }
                     
+                    print("🎯 후보 집계 완료: \(candidates.count)개")
                     if candidates.isEmpty {
+                        print("❌ 후보 배열이 비어있음 - 다음 버킷 시도")
                         tryBucket(index + 1)
                         return
+                    } else {
+                        print("✅ 후보 \(candidates.count)개로 매칭 시도")
                     }
                     
                     // 3) 의사 랜덤: pivot에 가장 가까운 randomSeed 선택(원형 거리)
