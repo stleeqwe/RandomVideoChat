@@ -86,8 +86,12 @@ class MatchingManager: ObservableObject {
         
         // 현재 사용자의 성별 정보 가져오기
         let currentUser = UserManager.shared.currentUser
-        let userGender = currentUser?.gender?.rawValue ?? ""
-        let preferredGender = currentUser?.preferredGender?.rawValue ?? ""
+        let userGender = currentUser?.gender?.rawValue ?? "any"
+        let preferredGender = currentUser?.preferredGender?.rawValue ?? "any"
+        
+        // 버킷과 랜덤 시드 생성 (개선된 매칭 알고리즘)
+        let bucket = "waiting_\(userGender)"
+        let randomSeed = Int.random(in: 0..<1_000_000)
         
         let userData: [String: Any] = [
             "userId": currentUserId,
@@ -96,7 +100,9 @@ class MatchingManager: ObservableObject {
             "matchId": NSNull(),
             "channelName": NSNull(),
             "gender": userGender,
-            "preferredGender": preferredGender
+            "preferredGender": preferredGender,
+            "bucket": bucket,
+            "randomSeed": randomSeed
         ]
 
         userRef.setValue(userData) { error, _ in
@@ -183,10 +189,10 @@ class MatchingManager: ObservableObject {
     private func startObserving() {
         let currentUserId = Auth.auth().currentUser?.uid ?? "testUser_\(UUID().uuidString.prefix(8))"
         
-        // 1. 내 상태 변화 관찰 (User B를 위해)
+        // 1. 내 상태 변화 관찰 (매칭 성공 감지용)
         observeMyStatus(userId: currentUserId)
         
-        // 2. 다른 대기자 찾기 (User A 역할)
+        // 2. 새로운 버킷 기반 매칭 시도 (단발성)
         findWaitingUsers(currentUserId: currentUserId)
     }
     
@@ -245,175 +251,205 @@ class MatchingManager: ObservableObject {
         }
     }
     
+    // MARK: - Improved Matching Algorithm
+    private func candidateBuckets(for myPref: String) -> [String] {
+        // 내 선호 성별에 맞는 상대 버킷
+        if myPref == "" || myPref == "any" {
+            return ["waiting_male", "waiting_female"]
+        } else {
+            return ["waiting_\(myPref)"]
+        }
+    }
+    
     private func findWaitingUsers(currentUserId: String) {
+        guard let me = UserManager.shared.currentUser else { return }
+        let myGender = me.gender?.rawValue ?? "any"
+        let myPref = me.preferredGender?.rawValue ?? "any"
+        
+        let buckets = candidateBuckets(for: myPref)
         let matchingRef = database.reference().child("matching_queue")
-        matchingHandle = matchingRef.observe(.value) { [weak self] snapshot in
-            guard let self = self, self.isMatching, !self.isMatched else { return }
-
-            var waitingUsers: [String] = []
-            for child in snapshot.children {
-                if let childSnapshot = child as? DataSnapshot,
-                   let data = childSnapshot.value as? [String: Any],
-                   let userId = data["userId"] as? String,
-                   let status = data["status"] as? String,
-                   status == "waiting" {
-                    waitingUsers.append(userId)
+        
+        let pivot = Int.random(in: 0..<1_000_000) // 랜덤 피벗
+        
+        func tryBucket(_ index: Int) {
+            guard index < buckets.count else {
+                print("⚠️ 후보 없음. 잠시 후 재시도.")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    self.findWaitingUsers(currentUserId: currentUserId)
                 }
-            }
-
-            // 자신만 대기열에 있는 경우 매칭 시도 안함
-            if waitingUsers.count <= 1 { return }
-
-            // 다른 대기자를 찾아 매칭 시도 (성별 호환성 확인)
-            for userId in waitingUsers {
-                if userId != currentUserId {
-                    if UserManager.shared.canMatchWith(userId) {
-                        // 성별 호환성 확인
-                        if self.checkGenderCompatibility(userId: userId, currentUserId: currentUserId, snapshot: snapshot) {
-                            self.tryMatch(with: userId, currentUserId: currentUserId)
-                            break
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Gender Compatibility Check
-    private func checkGenderCompatibility(userId: String, currentUserId: String, snapshot: DataSnapshot) -> Bool {
-        // 상대방 데이터 찾기
-        var otherUserData: [String: Any]? = nil
-        for child in snapshot.children {
-            if let childSnapshot = child as? DataSnapshot,
-               let data = childSnapshot.value as? [String: Any],
-               let waitingUserId = data["userId"] as? String,
-               waitingUserId == userId {
-                otherUserData = data
-                break
-            }
-        }
-        
-        guard let otherData = otherUserData else {
-            // 상대방 데이터가 없으면 기본적으로 매칭 허용 (이전 버전과의 호환성)
-            return true
-        }
-        
-        // 성별 정보 추출
-        let otherGender = otherData["gender"] as? String ?? ""
-        let otherPreferredGender = otherData["preferredGender"] as? String ?? ""
-        
-        let currentUser = UserManager.shared.currentUser
-        let myGender = currentUser?.gender?.rawValue ?? ""
-        let myPreferredGender = currentUser?.preferredGender?.rawValue ?? ""
-        
-        // 성별 정보가 없으면 기본적으로 매칭 허용 (이전 버전과의 호환성)
-        if myGender.isEmpty && otherGender.isEmpty {
-            return true
-        }
-        
-        // 성별 호환성 검사
-        // 1. 내가 선호하는 성별이 있고, 상대방이 그 성별이 아니면 불가
-        if !myPreferredGender.isEmpty && myPreferredGender != otherGender {
-            return false
-        }
-        
-        // 2. 상대방이 선호하는 성별이 있고, 내가 그 성별이 아니면 불가  
-        if !otherPreferredGender.isEmpty && otherPreferredGender != myGender {
-            return false
-        }
-        
-        return true
-    }
-
-    
-    private func tryMatch(with otherUserId: String, currentUserId: String) {
-        print("🔒 매칭 잠금 시도: \(otherUserId)")
-        
-        // 🆕 추가: ID 비교로 한 쪽만 매칭 생성 (작은 ID가 생성)
-        if currentUserId > otherUserId {
-            print("⏸ 상대방이 매칭을 생성하도록 대기")
-            return
-        }
-        
-        // 상대방 상태를 "matching"으로 변경 (원자적 연산)
-        let otherUserRef = database.reference().child("matching_queue").child(otherUserId)
-        
-        otherUserRef.runTransactionBlock { currentData in
-            guard let data = currentData.value as? [String: Any],
-                  let status = data["status"] as? String,
-                  status == "waiting" else {
-                return TransactionResult.abort()
-            }
-            
-            // 상태를 matching으로 변경
-            var newData = data
-            newData["status"] = "matching"
-            currentData.value = newData
-            
-            return TransactionResult.success(withValue: currentData)
-        } andCompletionBlock: { [weak self] error, committed, _ in
-            if committed && error == nil {
-                print("✅ 매칭 잠금 성공")
-                self?.proceedWithMatch(otherUserId: otherUserId, currentUserId: currentUserId)
-            } else {
-                print("❌ 매칭 잠금 실패 - 다른 사용자 찾기")
-            }
-        }
-    }
-    
-    private func proceedWithMatch(otherUserId: String, currentUserId: String) {
-        let matchesRef = database.reference().child("matches")
-        let matchId = UUID().uuidString
-        
-        // 짧은 채널 이름 생성
-        let timestamp = Int(Date().timeIntervalSince1970)
-        let channelName = "ch_\(timestamp)_\(Int.random(in: 1000...9999))"
-        
-        let matchData: [String: Any] = [
-            "user1": currentUserId,
-            "user2": otherUserId,
-            "channelName": channelName,
-            "timestamp": ServerValue.timestamp(),
-            "status": "active"
-        ]
-        
-        matchesRef.child(matchId).setValue(matchData) { [weak self] error, _ in
-            if let error = error {
-                print("매칭 생성 실패: \(error)")
-                // 실패 시 상대방 상태 복구
-                self?.resetUserStatus(userId: otherUserId)
                 return
             }
             
-            print("✅ 매칭 생성 성공!")
-            print("📺 생성된 채널: \(channelName)")
+            let bucket = buckets[index]
             
-            // 양쪽 사용자 상태 업데이트
-            self?.updateBothUsers(
-                user1: currentUserId,
-                user2: otherUserId,
-                matchId: matchId,
-                channelName: channelName
-            )
+            // 1) 버킷으로 1차 좁히기
+            matchingRef.queryOrdered(byChild: "bucket")
+                .queryEqual(toValue: bucket)
+                .queryLimited(toFirst: 250) // 너무 큰 응답 방지
+                .observeSingleEvent(of: .value) { snapshot in
+                    var candidates: [[String: Any]] = []
+                    
+                    for child in snapshot.children {
+                        guard let snap = child as? DataSnapshot,
+                              var dict = snap.value as? [String: Any] else { continue }
+                        
+                        let status = dict["status"] as? String ?? "waiting"
+                        let userId = dict["userId"] as? String ?? snap.key
+                        if status != "waiting" || userId == currentUserId { continue }
+                        
+                        // 2) 양방향 선호 필터링
+                        let candidatePref = (dict["preferredGender"] as? String) ?? "any"
+                        let candidateGender = (dict["gender"] as? String) ?? "any"
+                        
+                        let myPrefOK = (myPref == "any" || candidateGender == myPref)
+                        let hisPrefOK = (candidatePref == "any" || myGender == candidatePref)
+                        if !myPrefOK || !hisPrefOK { continue }
+                        
+                        // 차단/최근매칭 제외
+                        if !UserManager.shared.canMatchWith(userId) { continue }
+                        
+                        dict["userId"] = userId
+                        candidates.append(dict)
+                    }
+                    
+                    if candidates.isEmpty {
+                        tryBucket(index + 1)
+                        return
+                    }
+                    
+                    // 3) 의사 랜덤: pivot에 가장 가까운 randomSeed 선택(원형 거리)
+                    candidates.sort {
+                        let a = $0["randomSeed"] as? Int ?? 0
+                        let b = $1["randomSeed"] as? Int ?? 0
+                        let da = min(abs(a - pivot), 1_000_000 - abs(a - pivot))
+                        let db = min(abs(b - pivot), 1_000_000 - abs(b - pivot))
+                        return da < db
+                    }
+                    
+                    self.tryLockAndFinalize(currentUserId: currentUserId,
+                                            myGender: myGender,
+                                            candidateList: candidates,
+                                            index: 0,
+                                            onExhausted: {
+                                                tryBucket(index + 1)
+                                            })
+                }
         }
+        
+        tryBucket(0)
     }
     
-    private func updateBothUsers(user1: String, user2: String, matchId: String, channelName: String) {
-        let updates: [String: Any] = [
-            "matching_queue/\(user1)/status": "matched",
-            "matching_queue/\(user1)/matchId": matchId,
-            "matching_queue/\(user1)/channelName": channelName,
-            "matching_queue/\(user2)/status": "matched",
-            "matching_queue/\(user2)/matchId": matchId,
-            "matching_queue/\(user2)/channelName": channelName
-        ]
+    // MARK: - Atomic Lock System
+    private func tryLockAndFinalize(currentUserId: String,
+                                    myGender: String,
+                                    candidateList: [[String: Any]],
+                                    index: Int,
+                                    onExhausted: @escaping () -> Void) {
+        guard index < candidateList.count else {
+            onExhausted(); return
+        }
         
-        database.reference().updateChildValues(updates) { error, _ in
-            if error == nil {
-                print("✅ 양쪽 사용자 상태 업데이트 완료")
-                // 중복 처리 제거 - observeMyStatus에서 처리됨
-            } else {
-                print("❌ 상태 업데이트 실패: \(error?.localizedDescription ?? "")")
+        let candidate = candidateList[index]
+        let opponentId = candidate["userId"] as? String ?? ""
+        
+        // 매칭 ID와 채널명 미리 생성
+        let matchId = UUID().uuidString
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let channelName = "ch_\(timestamp)_\(Int.random(in: 1000...9999))"
+        
+        let candidateRef = database.reference().child("matching_queue").child(opponentId)
+        
+        // 1) 상대 노드 트랜잭션으로 상태 선점
+        candidateRef.runTransactionBlock({ currentData in
+            guard var dict = currentData.value as? [String: Any] else {
+                return TransactionResult.abort()
+            }
+            let status = (dict["status"] as? String) ?? "waiting"
+            if status != "waiting" { return TransactionResult.abort() }
+            
+            dict["status"] = "locked"
+            dict["lockedBy"] = currentUserId
+            dict["pendingMatchId"] = matchId
+            currentData.value = dict
+            return TransactionResult.success(withValue: currentData)
+        }) { error, committed, snap in
+            guard committed, error == nil else {
+                // 충돌 발생 → 다음 후보 시도
+                self.tryLockAndFinalize(currentUserId: currentUserId,
+                                        myGender: myGender,
+                                        candidateList: candidateList,
+                                        index: index + 1,
+                                        onExhausted: onExhausted)
+                return
+            }
+            
+            print("✅ 상대방 락 획득 성공: \(opponentId)")
+            
+            // 2) 내 노드 업데이트
+            let myRef = self.database.reference().child("matching_queue").child(currentUserId)
+            myRef.updateChildValues([
+                "status": "locked",
+                "lockedBy": opponentId,
+                "pendingMatchId": matchId
+            ]) { err, _ in
+                if let err = err {
+                    print("❌ 내 노드 업데이트 실패: \(err)")
+                    // 내 업데이트 실패 시 상대 락 해제
+                    candidateRef.updateChildValues([
+                        "status": "waiting",
+                        "lockedBy": NSNull(),
+                        "pendingMatchId": NSNull()
+                    ])
+                    // 다음 후보 시도
+                    self.tryLockAndFinalize(currentUserId: currentUserId,
+                                            myGender: myGender,
+                                            candidateList: candidateList,
+                                            index: index + 1,
+                                            onExhausted: onExhausted)
+                    return
+                }
+                
+                print("✅ 양쪽 락 획득 완료, 매칭 확정 진행")
+                
+                // 3) 매칭 확정(멀티 로케이션 업데이트)
+                let updates: [String: Any] = [
+                    "matches/\(matchId)/status": "active",
+                    "matches/\(matchId)/user1": currentUserId,
+                    "matches/\(matchId)/user2": opponentId,
+                    "matches/\(matchId)/channelName": channelName,
+                    "matches/\(matchId)/timestamp": ServerValue.timestamp(),
+                    "matching_queue/\(currentUserId)/status": "matched",
+                    "matching_queue/\(currentUserId)/matchId": matchId,
+                    "matching_queue/\(currentUserId)/channelName": channelName,
+                    "matching_queue/\(opponentId)/status": "matched",
+                    "matching_queue/\(opponentId)/matchId": matchId,
+                    "matching_queue/\(opponentId)/channelName": channelName
+                ]
+                
+                self.database.reference().updateChildValues(updates) { e, _ in
+                    if let e = e {
+                        print("❌ 매칭 확정 실패: \(e)")
+                        // 롤백(간단 버전)
+                        myRef.updateChildValues(["status": "waiting",
+                                                 "lockedBy": NSNull(),
+                                                 "pendingMatchId": NSNull()])
+                        candidateRef.updateChildValues(["status": "waiting",
+                                                        "lockedBy": NSNull(),
+                                                        "pendingMatchId": NSNull()])
+                        // 다음 후보 시도
+                        self.tryLockAndFinalize(currentUserId: currentUserId,
+                                                myGender: myGender,
+                                                candidateList: candidateList,
+                                                index: index + 1,
+                                                onExhausted: onExhausted)
+                    } else {
+                        print("✅ 매칭 확정 완료: \(matchId)")
+                        // 기존에 구현된 handleMatchSuccess(...) 호출
+                        self.handleMatchSuccess(matchId: matchId,
+                                                channelName: channelName,
+                                                matchedUserId: opponentId)
+                    }
+                }
             }
         }
     }
