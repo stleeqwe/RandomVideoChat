@@ -66,10 +66,14 @@ class MatchingManager: ObservableObject {
     
     func startMatching() {
         print("📱 MatchingManager: startMatching called")
+        
+        // 중복 호출 방지
+        guard !isMatching else {
+            print("⚠️ 이미 매칭 중 - 중복 호출 무시")
+            return
+        }
+        
         let currentUserId = Auth.auth().currentUser?.uid ?? "testUser_\(UUID().uuidString.prefix(8))"
-
-        // 기존에 남아 있는 큐 데이터 정리
-        removeFromQueue(userId: currentUserId)
 
         // 상태 초기화
         isMatching = true
@@ -86,7 +90,7 @@ class MatchingManager: ObservableObject {
             UserManager.shared.loadCurrentUserIfNeeded()
         }
 
-        // 매칭 큐에 새로 추가
+        // 매칭 큐에 데이터 업데이트 (삭제 없이 덮어쓰기)
         let matchingRef = database.reference().child("matching_queue")
         let userRef = matchingRef.child(currentUserId)
         
@@ -111,13 +115,14 @@ class MatchingManager: ObservableObject {
             "randomSeed": randomSeed
         ]
 
-        userRef.setValue(userData) { error, _ in
+        // 기존 데이터가 있어도 덮어쓰기만 함 (노드 삭제 없음)
+        userRef.updateChildValues(userData) { error, _ in
             if let error = error {
-                print("매칭 큐 추가 실패: \(error)")
+                print("매칭 큐 업데이트 실패: \(error)")
                 self.isMatching = false
                 return
             }
-            print("매칭 큐에 추가됨")
+            print("매칭 큐에 업데이트됨 (삭제 없이 덮어쓰기)")
             
             // onDisconnect 설정 - 연결이 끊어지면 자동으로 큐에서 제거
             userRef.onDisconnectRemoveValue()
@@ -497,13 +502,15 @@ class MatchingManager: ObservableObject {
             }) { error, committed, snap in
                 print("📝 트랜잭션 완료 - committed: \(committed), error: \(error?.localizedDescription ?? "없음")")
                 guard committed, error == nil else {
-                    print("❌ 트랜잭션 실패 - 다음 후보 시도")
-                    // 충돌 발생 → 다음 후보 시도
-                    self.tryLockAndFinalize(currentUserId: currentUserId,
-                                            myGender: myGender,
-                                            candidateList: candidateList,
-                                            index: index + 1,
-                                            onExhausted: onExhausted)
+                    print("❌ 트랜잭션 실패 - 0.1초 대기 후 다음 후보 시도")
+                    // 트랜잭션 실패 시 잠깐 대기 후 다음 후보 시도 (노드 재생성 대기)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        self.tryLockAndFinalize(currentUserId: currentUserId,
+                                                myGender: myGender,
+                                                candidateList: candidateList,
+                                                index: index + 1,
+                                                onExhausted: onExhausted)
+                    }
                     return
                 }
                 
