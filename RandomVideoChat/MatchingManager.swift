@@ -489,11 +489,15 @@ class MatchingManager: ObservableObject {
         }
     
     func signalCallEnd() {
+        // UserDefaults에서 matchId를 가져와서 오버로드된 함수 호출
         guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
-            print("❌ signalCallEnd: matchId가 없음")
+            print("❌ signalCallEnd: matchId가 없음 - UserDefaults에서 조회 실패")
             return
         }
-        
+        signalCallEnd(matchId: matchId)
+    }
+    
+    func signalCallEnd(matchId: String) {
         // 현재 사용자 ID 가져오기
         let currentUserId = Auth.auth().currentUser?.uid ?? ""
         print("📡 통화 종료 신호 전송 - matchId: \(matchId), userId: \(currentUserId)")

@@ -284,13 +284,22 @@ struct VideoCallView: View {
         backgroundTerminationWorkItem?.cancel()
         backgroundTerminationWorkItem = nil
         
-        // 매칭 상태를 항상 초기화 (isMatched = false 등)
+        if signalEnd {
+            // 내가 종료하는 경우에만 통화 종료 신호 전송 (matchId 삭제 전에 실행)
+            if let matchId = UserDefaults.standard.string(forKey: "currentMatchId") {
+                MatchingManager.shared.signalCallEnd(matchId: matchId)
+                print("📡 통화 종료 신호 전송 시도: matchId = \(matchId)")
+            } else {
+                print("❌ 통화 종료 신호 전송 실패: matchId가 없음")
+                // matchId가 없어도 일단 기본 함수 시도
+                MatchingManager.shared.signalCallEnd()
+            }
+        }
+        
+        // 매칭 상태를 항상 초기화 (signalEnd 후에 실행하여 matchId 삭제)
         MatchingManager.shared.cancelMatching()
         
-        if signalEnd {
-            // 내가 종료하는 경우에만 통화 종료 신호 전송
-            MatchingManager.shared.signalCallEnd()
-        } else {
+        if !signalEnd {
             // 상대방이 종료한 경우 MATCHED! 플래시 방지를 위해 플래그 설정
             MatchingManager.shared.callEndedByOpponent = true
         }
