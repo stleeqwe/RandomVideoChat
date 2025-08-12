@@ -405,35 +405,56 @@ class MatchingManager: ObservableObject {
                                     candidateList: [[String: Any]],
                                     index: Int,
                                     onExhausted: @escaping () -> Void) {
+        
+        print("🔒 tryLockAndFinalize 호출됨")
+        print("   - candidateList.count: \(candidateList.count)")
+        print("   - index: \(index)")
+        
         guard index < candidateList.count else {
+            print("❌ 인덱스 범위 벗어남 - onExhausted 호출")
             onExhausted(); return
         }
         
         let candidate = candidateList[index]
         let opponentId = candidate["userId"] as? String ?? ""
         
+        print("🎯 매칭 시도 대상: \(opponentId)")
+        
         // 매칭 ID와 채널명 미리 생성
         let matchId = UUID().uuidString
         let timestamp = Int(Date().timeIntervalSince1970)
         let channelName = "ch_\(timestamp)_\(Int.random(in: 1000...9999))"
         
+        print("🆔 매칭 ID 생성: \(matchId)")
+        print("📺 채널명 생성: \(channelName)")
+        
         let candidateRef = database.reference().child("matching_queue").child(opponentId)
         
+        print("🔒 Firebase 트랜잭션 시작...")
         // 1) 상대 노드 트랜잭션으로 상태 선점
         candidateRef.runTransactionBlock({ currentData in
+            print("🔄 트랜잭션 블록 내부 진입")
             guard var dict = currentData.value as? [String: Any] else {
+                print("❌ 트랜잭션 중단: 상대방 데이터 없음")
                 return TransactionResult.abort()
             }
             let status = (dict["status"] as? String) ?? "waiting"
-            if status != "waiting" { return TransactionResult.abort() }
+            print("🔍 상대방 현재 상태: \(status)")
+            if status != "waiting" { 
+                print("❌ 트랜잭션 중단: 상대방이 대기 상태가 아님")
+                return TransactionResult.abort() 
+            }
             
             dict["status"] = "locked"
             dict["lockedBy"] = currentUserId
             dict["pendingMatchId"] = matchId
             currentData.value = dict
+            print("✅ 트랜잭션 성공 데이터 반환")
             return TransactionResult.success(withValue: currentData)
         }) { error, committed, snap in
+            print("📝 트랜잭션 완료 - committed: \(committed), error: \(error?.localizedDescription ?? "없음")")
             guard committed, error == nil else {
+                print("❌ 트랜잭션 실패 - 다음 후보 시도")
                 // 충돌 발생 → 다음 후보 시도
                 self.tryLockAndFinalize(currentUserId: currentUserId,
                                         myGender: myGender,
