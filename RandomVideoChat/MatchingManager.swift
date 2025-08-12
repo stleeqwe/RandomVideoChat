@@ -272,9 +272,20 @@ class MatchingManager: ObservableObject {
         let pivot = Int.random(in: 0..<1_000_000) // 랜덤 피벗
         
         func tryBucket(_ index: Int) {
+            // 매칭 상태 확인 - 취소된 경우 재시도 중단
+            guard self.isMatching && !self.isMatched else {
+                print("🚫 매칭 취소됨 - 재시도 중단")
+                return
+            }
+            
             guard index < buckets.count else {
                 print("⚠️ 후보 없음. 잠시 후 재시도.")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    // 재시도 전에도 매칭 상태 재확인
+                    guard self.isMatching && !self.isMatched else {
+                        print("🚫 재시도 취소됨 - 매칭 상태 변경")
+                        return
+                    }
                     self.findWaitingUsers(currentUserId: currentUserId)
                 }
                 return
@@ -282,32 +293,69 @@ class MatchingManager: ObservableObject {
             
             let bucket = buckets[index]
             
-            // 1) 버킷으로 1차 좁히기
-            matchingRef.queryOrdered(byChild: "bucket")
-                .queryEqual(toValue: bucket)
-                .queryLimited(toFirst: 250) // 너무 큰 응답 방지
+            print("🔍 버킷 검색 시작: \(bucket) (내 성별: \(myGender), 내 선호: \(myPref))")
+            
+            // 임시: 인덱스 없어서 전체 쿼리 후 클라이언트 필터링
+            // TODO: Firebase Console에서 "bucket" 인덱스 추가 필요
+            matchingRef.queryLimited(toFirst: 250)
                 .observeSingleEvent(of: .value) { snapshot in
+                    print("📦 전체 큐 응답: \(snapshot.childrenCount)개 항목 (버킷 '\(bucket)' 필터링 예정)")
                     var candidates: [[String: Any]] = []
                     
                     for child in snapshot.children {
                         guard let snap = child as? DataSnapshot,
-                              var dict = snap.value as? [String: Any] else { continue }
+                              var dict = snap.value as? [String: Any] else { 
+                            print("❌ 스냅샷 파싱 실패")
+                            continue 
+                        }
                         
                         let status = dict["status"] as? String ?? "waiting"
                         let userId = dict["userId"] as? String ?? snap.key
-                        if status != "waiting" || userId == currentUserId { continue }
+                        let userBucket = dict["bucket"] as? String ?? "none"
+                        
+                        print("👤 후보 분석: \(userId)")
+                        print("   - 상태: \(status)")
+                        print("   - 버킷: \(userBucket)")
+                        print("   - 찾는 버킷: \(bucket)")
+                        
+                        // 버킷 필터링 (클라이언트 측)
+                        if userBucket != bucket {
+                            print("   ❌ 버킷 불일치")
+                            continue
+                        }
+                        
+                        if status != "waiting" {
+                            print("   ❌ 대기 상태 아님")
+                            continue
+                        }
+                        if userId == currentUserId {
+                            print("   ❌ 자기 자신")
+                            continue
+                        }
                         
                         // 2) 양방향 선호 필터링
                         let candidatePref = (dict["preferredGender"] as? String) ?? "any"
                         let candidateGender = (dict["gender"] as? String) ?? "any"
                         
+                        print("   - 후보 성별: \(candidateGender), 후보 선호: \(candidatePref)")
+                        
                         let myPrefOK = (myPref == "any" || candidateGender == myPref)
                         let hisPrefOK = (candidatePref == "any" || myGender == candidatePref)
-                        if !myPrefOK || !hisPrefOK { continue }
+                        
+                        print("   - 내 선호 충족: \(myPrefOK), 상대 선호 충족: \(hisPrefOK)")
+                        
+                        if !myPrefOK || !hisPrefOK { 
+                            print("   ❌ 성별 선호 불일치")
+                            continue 
+                        }
                         
                         // 차단/최근매칭 제외
-                        if !UserManager.shared.canMatchWith(userId) { continue }
+                        if !UserManager.shared.canMatchWith(userId) { 
+                            print("   ❌ 차단/최근매칭")
+                            continue 
+                        }
                         
+                        print("   ✅ 후보로 선정")
                         dict["userId"] = userId
                         candidates.append(dict)
                     }
