@@ -79,6 +79,12 @@ class MatchingManager: ObservableObject {
         // UserDefaults 초기화
         UserDefaults.standard.removeObject(forKey: "currentChannelName")
         UserDefaults.standard.removeObject(forKey: "currentMatchId")
+        
+        // 사용자 정보가 없으면 로딩 시도
+        if UserManager.shared.currentUser == nil {
+            print("⚠️ 사용자 정보 로딩 중 - 곧 재시도")
+            UserManager.shared.loadCurrentUserIfNeeded()
+        }
 
         // 매칭 큐에 새로 추가
         let matchingRef = database.reference().child("matching_queue")
@@ -150,6 +156,10 @@ class MatchingManager: ObservableObject {
         // UserDefaults에 저장 (중요!)
         UserDefaults.standard.set(channelName, forKey: "currentChannelName")
         UserDefaults.standard.set(matchId, forKey: "currentMatchId")
+        
+        // 세션 기록에 추가 (반복 매칭 방지)
+        UserManager.shared.addRecentMatch(matchedUserId)
+        print("📝 세션 매칭 기록에 추가: \(matchedUserId)")
         
         self.matchedUserId = matchedUserId
         self.isMatched = true
@@ -262,9 +272,11 @@ class MatchingManager: ObservableObject {
     }
     
     private func findWaitingUsers(currentUserId: String) {
-        guard let me = UserManager.shared.currentUser else { return }
-        let myGender = me.gender?.rawValue ?? "any"
-        let myPref = me.preferredGender?.rawValue ?? "any"
+        // currentUser가 nil이어도 기본값으로 매칭 진행
+        let myGender = UserManager.shared.currentUser?.gender?.rawValue ?? "any"
+        let myPref = UserManager.shared.currentUser?.preferredGender?.rawValue ?? "any"
+        
+        print("🔄 매칭 시도 - 내 성별: \(myGender), 선호: \(myPref), currentUser: \(UserManager.shared.currentUser != nil ? "로드됨" : "nil")")
         
         let buckets = candidateBuckets(for: myPref)
         let matchingRef = database.reference().child("matching_queue")
@@ -295,11 +307,11 @@ class MatchingManager: ObservableObject {
             
             print("🔍 버킷 검색 시작: \(bucket) (내 성별: \(myGender), 내 선호: \(myPref))")
             
-            // 임시: 인덱스 없어서 전체 쿼리 후 클라이언트 필터링
-            // TODO: Firebase Console에서 "bucket" 인덱스 추가 필요
-            matchingRef.queryLimited(toFirst: 250)
+            // 올바른 버킷 쿼리 (Firebase 인덱스가 있으면 최적화됨)
+            matchingRef.queryOrdered(byChild: "bucket")
+                .queryEqual(toValue: bucket)
                 .observeSingleEvent(of: .value) { snapshot in
-                    print("📦 전체 큐 응답: \(snapshot.childrenCount)개 항목 (버킷 '\(bucket)' 필터링 예정)")
+                    print("📦 버킷 '\(bucket)' 응답: \(snapshot.childrenCount)개 항목")
                     var candidates: [[String: Any]] = []
                     
                     for child in snapshot.children {
@@ -316,13 +328,6 @@ class MatchingManager: ObservableObject {
                         print("👤 후보 분석: \(userId)")
                         print("   - 상태: \(status)")
                         print("   - 버킷: \(userBucket)")
-                        print("   - 찾는 버킷: \(bucket)")
-                        
-                        // 버킷 필터링 (클라이언트 측)
-                        if userBucket != bucket {
-                            print("   ❌ 버킷 불일치")
-                            continue
-                        }
                         
                         if status != "waiting" {
                             print("   ❌ 대기 상태 아님")
