@@ -175,17 +175,19 @@ struct VideoCallView: View {
                             heartCountAnimation = false
                         }
                         
-                        // 하트 전송 로직을 UserManager로 통합 (중복 업데이트 방지)
                         if let uid = Auth.auth().currentUser?.uid {
-                            let newCount = heartCount - 1
-                            heartCount = newCount  // 즉시 UI 업데이트
-                            UserDefaults.standard.set(newCount, forKey: "heartCount")
+                            // 1) UI를 즉시 업데이트
+                            heartCount -= 1
+                            UserDefaults.standard.set(heartCount, forKey: "heartCount")
                             
+                            // 2) 타이머 +60초
                             timeRemaining += 60
                             MatchingManager.shared.updateCallTimer(timeRemaining)
                             
-                            // Firebase 업데이트와 상대방에게 하트 전송
-                            userManager.updateHeartCount(uid: uid, newCount: newCount)
+                            // 3) 서버에 원자적으로 하트 감소 (FieldValue.increment 사용)
+                            userManager.changeHeartCount(uid: uid, delta: -1)
+                            
+                            // 4) 상대방에게 하트 알림 전송
                             userManager.sendHeartToOpponent(opponentUserId)
                             
                             if isTimerStarted {
@@ -360,16 +362,14 @@ struct VideoCallView: View {
             .child("newHeart")
             .observe(.childAdded) { snapshot in
                 
-                // 하트 수신 로직을 원자적으로 처리
+                // 로컬 UI에서 즉시 반영
                 DispatchQueue.main.async {
                     heartCount += 1
                     UserDefaults.standard.set(heartCount, forKey: "heartCount")
-                    
-                    // Firebase 업데이트
-                    if let uid = Auth.auth().currentUser?.uid {
-                        userManager.updateHeartCount(uid: uid, newCount: heartCount)
-                    }
                 }
+                
+                // 서버에 +1 원자적 증가 (FieldValue.increment 사용)
+                userManager.changeHeartCount(uid: uid, delta: +1)
                 
                 // 알림 데이터 삭제
                 snapshot.ref.removeValue()
@@ -440,17 +440,37 @@ struct VideoCallView: View {
             }
         }
         
-        // 통화 종료 관찰
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            MatchingManager.shared.observeCallEnd {
-                guard !isCallEnding else { return }
-                // 상대방 종료 시 매칭 상태 초기화 및 callEndedByOpponent 설정
-                cleanupAfterCallEnd(signalEnd: false)
-                // 상태 변경이 뷰에 반영된 다음 한 프레임 뒤에 dismiss
-                DispatchQueue.main.async {
-                    presentationMode.wrappedValue.dismiss()
+        // 1) 통화 종료 관찰 등록 함수 정의
+        func registerCallEndObserver() {
+            if let matchId = UserDefaults.standard.string(forKey: "currentMatchId"), !matchId.isEmpty {
+                // endedBy 필드 기반 관찰
+                MatchingManager.shared.observeCallEnd {
+                    guard !isCallEnding else { return }
+                    cleanupAfterCallEnd(signalEnd: false)
+                    // 뷰 반영 후 dismiss
+                    DispatchQueue.main.async {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+                // status 필드 기반 관찰 (이중 안전장치)
+                MatchingManager.shared.observeCallStatusEnded {
+                    guard !isCallEnding else { return }
+                    cleanupAfterCallEnd(signalEnd: false)
+                    DispatchQueue.main.async {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            } else {
+                // matchId가 없으면 0.3초 후 재시도
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    registerCallEndObserver()
                 }
             }
+        }
+        
+        // 옵저버 등록 시작
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            registerCallEndObserver()
         }
     }
     

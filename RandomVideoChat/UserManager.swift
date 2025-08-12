@@ -248,6 +248,24 @@ class UserManager: ObservableObject {
         }
     }
     
+    // MARK: - Atomic Heart Management
+    func changeHeartCount(uid: String, delta: Int) {
+        db.collection("users").document(uid).updateData([
+            "heartCount": FieldValue.increment(Int64(delta))
+        ]) { [weak self] error in
+            if let error = error {
+                print("❌ 하트 수 변경 실패: \(error)")
+            } else {
+                // Firestore 업데이트가 끝나면 로컬 모델도 갱신
+                if var user = self?.currentUser {
+                    user.heartCount += delta
+                    self?.currentUser = user
+                }
+                print("✅ 하트 수 \(delta > 0 ? "증가" : "감소"): \(delta)")
+            }
+        }
+    }
+    
     // MARK: - Gender Management
     func updateGender(_ gender: Gender) {
         guard let uid = Auth.auth().currentUser?.uid else { return }

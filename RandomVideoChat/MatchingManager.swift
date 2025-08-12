@@ -13,6 +13,7 @@ class MatchingManager: ObservableObject {
     private var callEndHandle: DatabaseHandle?
     private var timerHandle: DatabaseHandle?
     private var presenceHandle: DatabaseHandle?
+    private var statusEndedHandle: DatabaseHandle?
     
     @Published var isMatching = false
     @Published var matchedUserId: String?
@@ -595,13 +596,52 @@ class MatchingManager: ObservableObject {
         print("✅ 통화 종료 옵저버 설정 완료 - matchId: \(matchId)")
     }
     
+    func observeCallStatusEnded(completion: @escaping () -> Void) {
+        guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
+            print("❌ observeCallStatusEnded: matchId가 없어서 상태 변경을 관찰할 수 없음")
+            return
+        }
+        
+        // 기존 핸들 제거
+        if let handle = statusEndedHandle {
+            database.reference().removeObserver(withHandle: handle)
+            statusEndedHandle = nil
+        }
+        
+        statusEndedHandle = database.reference()
+            .child("matches")
+            .child(matchId)
+            .child("status")
+            .observe(.value) { [weak self] snapshot in
+                if let status = snapshot.value as? String, status == "ended" {
+                    print("🔔 통화 상태 'ended' 감지")
+                    completion()
+                    
+                    // 한 번 실행 후 옵저버 제거
+                    if let handle = self?.statusEndedHandle {
+                        self?.database.reference().removeObserver(withHandle: handle)
+                        self?.statusEndedHandle = nil
+                    }
+                }
+            }
+        print("👀 통화 상태 종료 옵저버 설정 완료 - matchId: \(matchId)")
+    }
+    
     // MARK: - Observer Cleanup
     func cleanupCallObservers() {
         cleanupCallEndObserver()
         cleanupTimerObserver()
         cleanupPresenceObserver()
+        cleanupStatusEndedObserver()
         
         print("🧹 통화 관련 옵저버 정리 완료")
+    }
+    
+    private func cleanupStatusEndedObserver() {
+        if let handle = statusEndedHandle {
+            database.reference().removeObserver(withHandle: handle)
+            statusEndedHandle = nil
+        }
     }
     
     private func cleanupCallEndObserver() {
