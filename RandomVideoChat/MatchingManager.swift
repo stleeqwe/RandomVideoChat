@@ -329,6 +329,13 @@ class MatchingManager: ObservableObject {
                         print("   - 상태: \(status)")
                         print("   - 버킷: \(userBucket)")
                         
+                        // 스테일 데이터 정리: 존재하지 않는 노드 감지
+                        if !snap.exists() {
+                            print("   🧹 스테일 데이터 감지 - 정리 중...")
+                            snap.ref.removeValue()
+                            continue
+                        }
+                        
                         if status != "waiting" {
                             print("   ❌ 대기 상태 아님")
                             continue
@@ -430,32 +437,11 @@ class MatchingManager: ObservableObject {
         
         let candidateRef = database.reference().child("matching_queue").child(opponentId)
         
-        print("🔒 Firebase 트랜잭션 시작...")
-        // 1) 상대 노드 트랜잭션으로 상태 선점
-        candidateRef.runTransactionBlock({ currentData in
-            print("🔄 트랜잭션 블록 내부 진입")
-            guard var dict = currentData.value as? [String: Any] else {
-                print("❌ 트랜잭션 중단: 상대방 데이터 없음")
-                return TransactionResult.abort()
-            }
-            let status = (dict["status"] as? String) ?? "waiting"
-            print("🔍 상대방 현재 상태: \(status)")
-            if status != "waiting" { 
-                print("❌ 트랜잭션 중단: 상대방이 대기 상태가 아님")
-                return TransactionResult.abort() 
-            }
-            
-            dict["status"] = "locked"
-            dict["lockedBy"] = currentUserId
-            dict["pendingMatchId"] = matchId
-            currentData.value = dict
-            print("✅ 트랜잭션 성공 데이터 반환")
-            return TransactionResult.success(withValue: currentData)
-        }) { error, committed, snap in
-            print("📝 트랜잭션 완료 - committed: \(committed), error: \(error?.localizedDescription ?? "없음")")
-            guard committed, error == nil else {
-                print("❌ 트랜잭션 실패 - 다음 후보 시도")
-                // 충돌 발생 → 다음 후보 시도
+        print("🔍 트랜잭션 전 상대방 데이터 존재 확인...")
+        // 트랜잭션 전에 상대방 데이터 존재 여부 먼저 확인
+        candidateRef.observeSingleEvent(of: .value) { snapshot in
+            guard snapshot.exists() else {
+                print("🚫 상대방 노드 없음 - 큐에서 사라짐. 다음 후보로 넘어갑니다.")
                 self.tryLockAndFinalize(currentUserId: currentUserId,
                                         myGender: myGender,
                                         candidateList: candidateList,
@@ -464,24 +450,55 @@ class MatchingManager: ObservableObject {
                 return
             }
             
-            print("✅ 상대방 락 획득 성공: \(opponentId)")
+            guard var dict = snapshot.value as? [String: Any] else {
+                print("🚫 상대방 데이터 형식 오류. 다음 후보로 넘어갑니다.")
+                self.tryLockAndFinalize(currentUserId: currentUserId,
+                                        myGender: myGender,
+                                        candidateList: candidateList,
+                                        index: index + 1,
+                                        onExhausted: onExhausted)
+                return
+            }
             
-            // 2) 내 노드 업데이트
-            let myRef = self.database.reference().child("matching_queue").child(currentUserId)
-            myRef.updateChildValues([
-                "status": "locked",
-                "lockedBy": opponentId,
-                "pendingMatchId": matchId
-            ]) { err, _ in
-                if let err = err {
-                    print("❌ 내 노드 업데이트 실패: \(err)")
-                    // 내 업데이트 실패 시 상대 락 해제
-                    candidateRef.updateChildValues([
-                        "status": "waiting",
-                        "lockedBy": NSNull(),
-                        "pendingMatchId": NSNull()
-                    ])
-                    // 다음 후보 시도
+            let status = dict["status"] as? String ?? "waiting"
+            print("🔍 상대방 현재 상태 확인: \(status)")
+            if status != "waiting" {
+                print("🚫 상대방이 이미 대기 상태가 아님(\(status)). 다음 후보로 넘어갑니다.")
+                self.tryLockAndFinalize(currentUserId: currentUserId,
+                                        myGender: myGender,
+                                        candidateList: candidateList,
+                                        index: index + 1,
+                                        onExhausted: onExhausted)
+                return
+            }
+            
+            print("✅ 상대방 데이터 유효성 확인 완료 - 트랜잭션 시작")
+            
+            // 여기서 트랜잭션 실행
+            candidateRef.runTransactionBlock({ currentData in
+                print("🔄 트랜잭션 블록 내부 진입")
+                guard var dict = currentData.value as? [String: Any] else {
+                    print("❌ 트랜잭션 중단: 상대방 데이터 없음 (검증 후에도 사라짐)")
+                    return TransactionResult.abort()
+                }
+                let status = (dict["status"] as? String) ?? "waiting"
+                print("🔍 트랜잭션 내 상대방 상태: \(status)")
+                if status != "waiting" { 
+                    print("❌ 트랜잭션 중단: 상대방이 대기 상태가 아님")
+                    return TransactionResult.abort() 
+                }
+                
+                dict["status"] = "locked"
+                dict["lockedBy"] = currentUserId
+                dict["pendingMatchId"] = matchId
+                currentData.value = dict
+                print("✅ 트랜잭션 성공 데이터 반환")
+                return TransactionResult.success(withValue: currentData)
+            }) { error, committed, snap in
+                print("📝 트랜잭션 완료 - committed: \(committed), error: \(error?.localizedDescription ?? "없음")")
+                guard committed, error == nil else {
+                    print("❌ 트랜잭션 실패 - 다음 후보 시도")
+                    // 충돌 발생 → 다음 후보 시도
                     self.tryLockAndFinalize(currentUserId: currentUserId,
                                             myGender: myGender,
                                             candidateList: candidateList,
@@ -490,45 +507,72 @@ class MatchingManager: ObservableObject {
                     return
                 }
                 
-                print("✅ 양쪽 락 획득 완료, 매칭 확정 진행")
+                print("✅ 상대방 락 획득 성공: \(opponentId)")
                 
-                // 3) 매칭 확정(멀티 로케이션 업데이트)
-                let updates: [String: Any] = [
-                    "matches/\(matchId)/status": "active",
-                    "matches/\(matchId)/user1": currentUserId,
-                    "matches/\(matchId)/user2": opponentId,
-                    "matches/\(matchId)/channelName": channelName,
-                    "matches/\(matchId)/timestamp": ServerValue.timestamp(),
-                    "matching_queue/\(currentUserId)/status": "matched",
-                    "matching_queue/\(currentUserId)/matchId": matchId,
-                    "matching_queue/\(currentUserId)/channelName": channelName,
-                    "matching_queue/\(opponentId)/status": "matched",
-                    "matching_queue/\(opponentId)/matchId": matchId,
-                    "matching_queue/\(opponentId)/channelName": channelName
-                ]
-                
-                self.database.reference().updateChildValues(updates) { e, _ in
-                    if let e = e {
-                        print("❌ 매칭 확정 실패: \(e)")
-                        // 롤백(간단 버전)
-                        myRef.updateChildValues(["status": "waiting",
-                                                 "lockedBy": NSNull(),
-                                                 "pendingMatchId": NSNull()])
-                        candidateRef.updateChildValues(["status": "waiting",
-                                                        "lockedBy": NSNull(),
-                                                        "pendingMatchId": NSNull()])
+                // 2) 내 노드 업데이트
+                let myRef = self.database.reference().child("matching_queue").child(currentUserId)
+                myRef.updateChildValues([
+                    "status": "locked",
+                    "lockedBy": opponentId,
+                    "pendingMatchId": matchId
+                ]) { err, _ in
+                    if let err = err {
+                        print("❌ 내 노드 업데이트 실패: \(err)")
+                        // 내 업데이트 실패 시 상대 락 해제
+                        candidateRef.updateChildValues([
+                            "status": "waiting",
+                            "lockedBy": NSNull(),
+                            "pendingMatchId": NSNull()
+                        ])
                         // 다음 후보 시도
                         self.tryLockAndFinalize(currentUserId: currentUserId,
                                                 myGender: myGender,
                                                 candidateList: candidateList,
                                                 index: index + 1,
                                                 onExhausted: onExhausted)
-                    } else {
-                        print("✅ 매칭 확정 완료: \(matchId)")
-                        // 기존에 구현된 handleMatchSuccess(...) 호출
-                        self.handleMatchSuccess(matchId: matchId,
-                                                channelName: channelName,
-                                                matchedUserId: opponentId)
+                        return
+                    }
+                    
+                    print("✅ 양쪽 락 획득 완료, 매칭 확정 진행")
+                    
+                    // 3) 매칭 확정(멀티 로케이션 업데이트)
+                    let updates: [String: Any] = [
+                        "matches/\(matchId)/status": "active",
+                        "matches/\(matchId)/user1": currentUserId,
+                        "matches/\(matchId)/user2": opponentId,
+                        "matches/\(matchId)/channelName": channelName,
+                        "matches/\(matchId)/timestamp": ServerValue.timestamp(),
+                        "matching_queue/\(currentUserId)/status": "matched",
+                        "matching_queue/\(currentUserId)/matchId": matchId,
+                        "matching_queue/\(currentUserId)/channelName": channelName,
+                        "matching_queue/\(opponentId)/status": "matched",
+                        "matching_queue/\(opponentId)/matchId": matchId,
+                        "matching_queue/\(opponentId)/channelName": channelName
+                    ]
+                    
+                    self.database.reference().updateChildValues(updates) { e, _ in
+                        if let e = e {
+                            print("❌ 매칭 확정 실패: \(e)")
+                            // 롤백(간단 버전)
+                            myRef.updateChildValues(["status": "waiting",
+                                                     "lockedBy": NSNull(),
+                                                     "pendingMatchId": NSNull()])
+                            candidateRef.updateChildValues(["status": "waiting",
+                                                            "lockedBy": NSNull(),
+                                                            "pendingMatchId": NSNull()])
+                            // 다음 후보 시도
+                            self.tryLockAndFinalize(currentUserId: currentUserId,
+                                                    myGender: myGender,
+                                                    candidateList: candidateList,
+                                                    index: index + 1,
+                                                    onExhausted: onExhausted)
+                        } else {
+                            print("✅ 매칭 확정 완료: \(matchId)")
+                            // 기존에 구현된 handleMatchSuccess(...) 호출
+                            self.handleMatchSuccess(matchId: matchId,
+                                                    channelName: channelName,
+                                                    matchedUserId: opponentId)
+                        }
                     }
                 }
             }
