@@ -82,12 +82,20 @@ class MatchingManager: ObservableObject {
         // 매칭 큐에 새로 추가
         let matchingRef = database.reference().child("matching_queue")
         let userRef = matchingRef.child(currentUserId)
+        
+        // 현재 사용자의 성별 정보 가져오기
+        let currentUser = UserManager.shared.currentUser
+        let userGender = currentUser?.gender?.rawValue ?? ""
+        let preferredGender = currentUser?.preferredGender?.rawValue ?? ""
+        
         let userData: [String: Any] = [
             "userId": currentUserId,
             "timestamp": ServerValue.timestamp(),
             "status": "waiting",
             "matchId": NSNull(),
-            "channelName": NSNull()
+            "channelName": NSNull(),
+            "gender": userGender,
+            "preferredGender": preferredGender
         ]
 
         userRef.setValue(userData) { error, _ in
@@ -255,16 +263,65 @@ class MatchingManager: ObservableObject {
             // 자신만 대기열에 있는 경우 매칭 시도 안함
             if waitingUsers.count <= 1 { return }
 
-            // 다른 대기자를 찾아 매칭 시도
+            // 다른 대기자를 찾아 매칭 시도 (성별 호환성 확인)
             for userId in waitingUsers {
                 if userId != currentUserId {
                     if UserManager.shared.canMatchWith(userId) {
-                        self.tryMatch(with: userId, currentUserId: currentUserId)
-                        break
+                        // 성별 호환성 확인
+                        if self.checkGenderCompatibility(userId: userId, currentUserId: currentUserId, snapshot: snapshot) {
+                            self.tryMatch(with: userId, currentUserId: currentUserId)
+                            break
+                        }
                     }
                 }
             }
         }
+    }
+    
+    // MARK: - Gender Compatibility Check
+    private func checkGenderCompatibility(userId: String, currentUserId: String, snapshot: DataSnapshot) -> Bool {
+        // 상대방 데이터 찾기
+        var otherUserData: [String: Any]? = nil
+        for child in snapshot.children {
+            if let childSnapshot = child as? DataSnapshot,
+               let data = childSnapshot.value as? [String: Any],
+               let waitingUserId = data["userId"] as? String,
+               waitingUserId == userId {
+                otherUserData = data
+                break
+            }
+        }
+        
+        guard let otherData = otherUserData else {
+            // 상대방 데이터가 없으면 기본적으로 매칭 허용 (이전 버전과의 호환성)
+            return true
+        }
+        
+        // 성별 정보 추출
+        let otherGender = otherData["gender"] as? String ?? ""
+        let otherPreferredGender = otherData["preferredGender"] as? String ?? ""
+        
+        let currentUser = UserManager.shared.currentUser
+        let myGender = currentUser?.gender?.rawValue ?? ""
+        let myPreferredGender = currentUser?.preferredGender?.rawValue ?? ""
+        
+        // 성별 정보가 없으면 기본적으로 매칭 허용 (이전 버전과의 호환성)
+        if myGender.isEmpty && otherGender.isEmpty {
+            return true
+        }
+        
+        // 성별 호환성 검사
+        // 1. 내가 선호하는 성별이 있고, 상대방이 그 성별이 아니면 불가
+        if !myPreferredGender.isEmpty && myPreferredGender != otherGender {
+            return false
+        }
+        
+        // 2. 상대방이 선호하는 성별이 있고, 내가 그 성별이 아니면 불가  
+        if !otherPreferredGender.isEmpty && otherPreferredGender != myGender {
+            return false
+        }
+        
+        return true
     }
 
     
@@ -431,23 +488,30 @@ class MatchingManager: ObservableObject {
         }
     
     func signalCallEnd() {
-            guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
-                return
-            }
-            
-            // 현재 사용자 ID 가져오기
-            let currentUserId = Auth.auth().currentUser?.uid ?? ""
-            
-            // Firebase에 통화 종료 신호 - 사용자별로 따로 저장
-            let updates: [String: Any] = [
-                "matches/\(matchId)/endedBy/\(currentUserId)": true,
-                "matches/\(matchId)/endedAt": ServerValue.timestamp()
-            ]
-            
-            database.reference().updateChildValues(updates) { error, _ in
-                // Silent completion
+        guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
+            print("❌ signalCallEnd: matchId가 없음")
+            return
+        }
+        
+        // 현재 사용자 ID 가져오기
+        let currentUserId = Auth.auth().currentUser?.uid ?? ""
+        print("📡 통화 종료 신호 전송 - matchId: \(matchId), userId: \(currentUserId)")
+        
+        // Firebase에 통화 종료 신호 - 사용자별로 따로 저장
+        let updates: [String: Any] = [
+            "matches/\(matchId)/endedBy/\(currentUserId)": true,
+            "matches/\(matchId)/endedAt": ServerValue.timestamp(),
+            "matches/\(matchId)/status": "ended"
+        ]
+        
+        database.reference().updateChildValues(updates) { error, _ in
+            if let error = error {
+                print("❌ 통화 종료 신호 전송 실패: \(error)")
+            } else {
+                print("✅ 통화 종료 신호 전송 성공")
             }
         }
+    }
     
     func observeOpponentPresence(opponentId: String, onDisconnect: @escaping () -> Void) {
         // 기존 리스너 정리
@@ -490,38 +554,45 @@ class MatchingManager: ObservableObject {
     // MARK: - 통화 종료 관찰
     func observeCallEnd(completion: @escaping () -> Void) {
         guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId") else {
-            print("❌ matchId가 없어서 통화 종료를 관찰할 수 없음")
+            print("❌ observeCallEnd: matchId가 없어서 통화 종료를 관찰할 수 없음")
             return
         }
         
         let currentUserId = Auth.auth().currentUser?.uid ?? ""
+        print("👀 통화 종료 관찰 시작 - matchId: \(matchId), currentUserId: \(currentUserId)")
         
         // 기존 옵저버 제거
         if let handle = callEndHandle {
             database.reference().removeObserver(withHandle: handle)
+            callEndHandle = nil
         }
         
-        // 상대방의 종료 신호 관찰
+        // 상대방의 종료 신호 관찰 - endedBy 노드 변화 감지
         callEndHandle = database.reference()
             .child("matches")
             .child(matchId)
             .child("endedBy")
-            .observe(.childAdded) { snapshot in
+            .observe(.childAdded) { [weak self] snapshot in
                 let endedByUserId = snapshot.key
+                print("🔔 통화 종료 신호 감지 - endedBy: \(endedByUserId), currentUser: \(currentUserId)")
                 
                 // 자신이 아닌 다른 사용자가 종료한 경우
                 if endedByUserId != currentUserId {
+                    print("✅ 상대방 종료 확인 - 통화 종료 처리")
                     completion()
                     
                     // 한 번 실행 후 옵저버 제거
-                    if let handle = self.callEndHandle {
-                        self.database.reference().removeObserver(withHandle: handle)
-                        self.callEndHandle = nil
+                    if let handle = self?.callEndHandle {
+                        self?.database.reference().removeObserver(withHandle: handle)
+                        self?.callEndHandle = nil
+                        print("🧹 통화 종료 옵저버 제거 완료")
                     }
+                } else {
+                    print("ℹ️ 내가 종료한 신호이므로 무시")
                 }
             }
         
-        print("👀 통화 종료 옵저버 설정 완료 - matchId: \(matchId)")
+        print("✅ 통화 종료 옵저버 설정 완료 - matchId: \(matchId)")
     }
     
     // MARK: - Observer Cleanup

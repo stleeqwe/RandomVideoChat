@@ -30,11 +30,15 @@ class UserManager: ObservableObject {
                 let blockedUsers = data["blockedUsers"] as? [String] ?? []
                 let email = data["email"] as? String
                 let displayName = data["displayName"] as? String
+                let genderString = data["gender"] as? String ?? ""
+                let preferredGenderString = data["preferredGender"] as? String ?? ""
                 
                 // User 생성 - User의 실제 초기화 함수에 맞게
                 var user = User(uid: uid, email: email, displayName: displayName)
                 user.heartCount = heartCount
                 user.blockedUsers = blockedUsers
+                user.gender = Gender(rawValue: genderString)
+                user.preferredGender = Gender(rawValue: preferredGenderString)
                 self?.currentUser = user
                 
                 print("✅ 사용자 데이터 로드 완료: \(heartCount) 하트")
@@ -240,6 +244,43 @@ class UserManager: ObservableObject {
         ]) { error in
             if error == nil {
                 print("✅ 매칭 횟수 증가")
+            }
+        }
+    }
+    
+    // MARK: - Gender Management
+    func updateGender(_ gender: Gender) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        
+        db.collection("users").document(uid).updateData([
+            "gender": gender.rawValue
+        ]) { [weak self] error in
+            if error == nil {
+                self?.currentUser?.gender = gender
+                print("✅ 성별 업데이트 완료: \(gender.displayName)")
+            } else {
+                print("❌ 성별 업데이트 실패: \(error?.localizedDescription ?? "")")
+            }
+        }
+    }
+    
+    func updatePreferredGender(_ gender: Gender?) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        
+        let genderValue = gender?.rawValue ?? ""
+        
+        db.collection("users").document(uid).updateData([
+            "preferredGender": genderValue
+        ]) { [weak self] error in
+            if error == nil {
+                self?.currentUser?.preferredGender = gender
+                if let gender = gender {
+                    print("✅ 선호 성별 업데이트 완료: \(gender.displayName)")
+                } else {
+                    print("✅ 선호 성별 선택 해제 완료")
+                }
+            } else {
+                print("❌ 선호 성별 업데이트 실패: \(error?.localizedDescription ?? "")")
             }
         }
     }

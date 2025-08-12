@@ -175,18 +175,22 @@ struct VideoCallView: View {
                             heartCountAnimation = false
                         }
                         
-                        heartCount -= 1
-                        UserDefaults.standard.set(heartCount, forKey: "heartCount")
-                        timeRemaining += 60
-                        
-                        MatchingManager.shared.updateCallTimer(timeRemaining)
-                        userManager.sendHeartToOpponent(opponentUserId)
-                        
+                        // 하트 전송 로직을 UserManager로 통합 (중복 업데이트 방지)
                         if let uid = Auth.auth().currentUser?.uid {
-                            userManager.updateHeartCount(uid: uid, newCount: heartCount)
-                        }
-                        if isTimerStarted {
-                            startTimer()
+                            let newCount = heartCount - 1
+                            heartCount = newCount  // 즉시 UI 업데이트
+                            UserDefaults.standard.set(newCount, forKey: "heartCount")
+                            
+                            timeRemaining += 60
+                            MatchingManager.shared.updateCallTimer(timeRemaining)
+                            
+                            // Firebase 업데이트와 상대방에게 하트 전송
+                            userManager.updateHeartCount(uid: uid, newCount: newCount)
+                            userManager.sendHeartToOpponent(opponentUserId)
+                            
+                            if isTimerStarted {
+                                startTimer()
+                            }
                         }
                     }
                 }) {
@@ -278,10 +282,15 @@ struct VideoCallView: View {
         backgroundTerminationWorkItem?.cancel()
         backgroundTerminationWorkItem = nil
         
-        // 통화 종료 신호 전송 (필요한 경우에만)
+        // 매칭 상태를 항상 초기화 (isMatched = false 등)
+        MatchingManager.shared.cancelMatching()
+        
         if signalEnd {
+            // 내가 종료하는 경우에만 통화 종료 신호 전송
             MatchingManager.shared.signalCallEnd()
-            MatchingManager.shared.cancelMatching()
+        } else {
+            // 상대방이 종료한 경우 MATCHED! 플래시 방지를 위해 플래그 설정
+            MatchingManager.shared.callEndedByOpponent = true
         }
         
         // 타이머 정리
@@ -350,10 +359,19 @@ struct VideoCallView: View {
             .child(uid)
             .child("newHeart")
             .observe(.childAdded) { snapshot in
-                heartCount += 1
-                if let uid = Auth.auth().currentUser?.uid {
-                    userManager.updateHeartCount(uid: uid, newCount: heartCount)
+                
+                // 하트 수신 로직을 원자적으로 처리
+                DispatchQueue.main.async {
+                    heartCount += 1
+                    UserDefaults.standard.set(heartCount, forKey: "heartCount")
+                    
+                    // Firebase 업데이트
+                    if let uid = Auth.auth().currentUser?.uid {
+                        userManager.updateHeartCount(uid: uid, newCount: heartCount)
+                    }
                 }
+                
+                // 알림 데이터 삭제
                 snapshot.ref.removeValue()
             }
     }
@@ -426,8 +444,12 @@ struct VideoCallView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             MatchingManager.shared.observeCallEnd {
                 guard !isCallEnding else { return }
-                cleanupAfterCallEnd(signalEnd: false) // 이미 다른 사용자가 종료했으므로 중복 신호 방지
-                presentationMode.wrappedValue.dismiss()
+                // 상대방 종료 시 매칭 상태 초기화 및 callEndedByOpponent 설정
+                cleanupAfterCallEnd(signalEnd: false)
+                // 상태 변경이 뷰에 반영된 다음 한 프레임 뒤에 dismiss
+                DispatchQueue.main.async {
+                    presentationMode.wrappedValue.dismiss()
+                }
             }
         }
     }

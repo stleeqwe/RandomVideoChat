@@ -48,6 +48,33 @@ struct MainView: View {
                 Spacer()
                 
                 HStack {
+                    // 성별 선택 UI (좌측)
+                    VStack(spacing: 20) {
+                        GenderSelectionView(
+                            title: "내 성별",
+                            isRequired: true,
+                            selectedGender: userManager.currentUser?.gender,
+                            onGenderSelected: { gender in
+                                userManager.updateGender(gender)
+                            }
+                        )
+                        
+                        GenderSelectionView(
+                            title: "선호 성별",
+                            isRequired: false,
+                            selectedGender: userManager.currentUser?.preferredGender,
+                            onGenderSelected: { gender in
+                                // 선호 성별은 토글 가능 - 같은 성별 재선택 시 해제
+                                if userManager.currentUser?.preferredGender == gender {
+                                    userManager.updatePreferredGender(nil)
+                                } else {
+                                    userManager.updatePreferredGender(gender)
+                                }
+                            }
+                        )
+                    }
+                    .padding(.leading, 20)
+                    
                     Spacer()
                     
                     // 카메라 아이콘과 하트 카운터 (우측 상단)
@@ -161,18 +188,35 @@ struct MainView: View {
                 .onEnded { value in
                     // 위로 스와이프 감지
                     if value.translation.height < -50 {
-                        print("⬆️ 스와이프 감지 - 매칭 화면 표시")
-                        showMatchingView = true
+                        print("⬆️ 스와이프 감지 - 성별 확인 중...")
+                        
+                        // 내 성별이 선택되어야만 매칭 시작
+                        if userManager.currentUser?.gender != nil {
+                            print("✅ 성별 선택 완료 - 매칭 화면 표시")
+                            showMatchingView = true
+                        } else {
+                            print("❌ 성별 선택 필요 - 알림 표시")
+                            permissionMessage = "매칭을 시작하려면 먼저 성별을 선택해주세요."
+                            showPermissionAlert = true
+                        }
                     }
                 }
         )
         .alert(isPresented: $showPermissionAlert) {
-            Alert(title: Text("권한 필요"),
-                  message: Text(permissionMessage),
-                  primaryButton: .default(Text("설정 열기"), action: {
-                      openSettings()
-                  }),
-                  secondaryButton: .cancel(Text("닫기")))
+            if permissionMessage.contains("성별") {
+                // 성별 선택 알림
+                Alert(title: Text("성별 선택 필요"),
+                      message: Text(permissionMessage),
+                      dismissButton: .default(Text("확인")))
+            } else {
+                // 권한 관련 알림
+                Alert(title: Text("권한 필요"),
+                      message: Text(permissionMessage),
+                      primaryButton: .default(Text("설정 열기"), action: {
+                          openSettings()
+                      }),
+                      secondaryButton: .cancel(Text("닫기")))
+            }
         }
         .onAppear {
             // 저장된 카메라 상태 복원
@@ -275,6 +319,56 @@ struct MainView: View {
             print("🎤 마이크 권한: \(granted)")
             DispatchQueue.main.async {
                 self.permissionsGranted = granted
+            }
+        }
+    }
+}
+
+// MARK: - Gender Selection Component
+struct GenderSelectionView: View {
+    let title: String
+    let isRequired: Bool
+    let selectedGender: Gender?
+    let onGenderSelected: (Gender) -> Void
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.custom("Carter One", size: 14))
+                    .foregroundColor(.white)
+                
+                if isRequired {
+                    Text("*")
+                        .font(.custom("Carter One", size: 14))
+                        .foregroundColor(.red)
+                }
+            }
+            
+            HStack(spacing: 12) {
+                ForEach(Gender.allCases, id: \.self) { gender in
+                    Button(action: {
+                        onGenderSelected(gender)
+                    }) {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(selectedGender == gender ? Color.white : Color.white.opacity(0.3))
+                                    .frame(width: 40, height: 40)
+                                
+                                Image(systemName: gender.icon)
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundColor(selectedGender == gender ? .black : .white)
+                            }
+                            
+                            Text(gender.displayName)
+                                .font(.custom("Carter One", size: 12))
+                                .foregroundColor(selectedGender == gender ? .white : .white.opacity(0.7))
+                        }
+                    }
+                    .scaleEffect(selectedGender == gender ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 0.2), value: selectedGender)
+                }
             }
         }
     }

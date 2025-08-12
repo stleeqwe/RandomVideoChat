@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		883B1C7F2E4AA68200143841 /* GoogleSansCode-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */; };
 		8871CC4B2E40DAB90096BD2F /* RandomVideoChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC4A2E40DAB90096BD2F /* RandomVideoChatApp.swift */; };
 		8871CC4D2E40DAB90096BD2F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC4C2E40DAB90096BD2F /* ContentView.swift */; };
 		8871CC4F2E40DABB0096BD2F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8871CC4E2E40DABB0096BD2F /* Assets.xcassets */; };
@@ -55,6 +56,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GoogleSansCode-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		8871CC472E40DAB90096BD2F /* RandomVideoChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RandomVideoChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8871CC4A2E40DAB90096BD2F /* RandomVideoChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RandomVideoChatApp.swift; sourceTree = "<group>"; };
 		8871CC4C2E40DAB90096BD2F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -139,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */,
+				883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */,
 				88DFC5CA2E416F5100A601E4 /* RandomVideoChat.entitlements */,
 				8871CC7F2E40E7380096BD2F /* Info.plist */,
 				8871CC742E40DEF60096BD2F /* GoogleService-Info.plist */,
@@ -308,6 +311,7 @@
 				8871CC4F2E40DABB0096BD2F /* Assets.xcassets in Resources */,
 				8871CC752E40DEF60096BD2F /* GoogleService-Info.plist in Resources */,
 				8889DB3F2E48C1CE0040E898 /* CarterOne-Regular.ttf in Resources */,
+				883B1C7F2E4AA68200143841 /* GoogleSansCode-VariableFont_wght.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
