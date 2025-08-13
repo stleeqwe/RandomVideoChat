@@ -7,7 +7,6 @@ import CryptoKit
 struct AuthenticationView: View {
     @Binding var isAuthenticated: Bool
     @State private var isLoading = false
-    @State private var currentNonce: String?
     
     var body: some View {
         ZStack {
@@ -64,7 +63,7 @@ struct AuthenticationView: View {
                             .easeInOut(duration: Double.random(in: 4...8))
                                 .repeatForever(autoreverses: true)
                                 .delay(Double(index) * 0.2),
-                            value: currentNonce
+                            value: isLoading
                         )
                 }
             }
@@ -188,27 +187,16 @@ struct AuthenticationView: View {
                                     endPoint: .trailing
                                 )
                             )
+                        
+                        Text("익명으로 시작하기")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.white.opacity(0.7))
+                            .padding(.top, 8)
                     }
                 }
                 .padding(.top, 100)
                 
                 Spacer()
-                
-                // Apple Sign In 버튼
-                SignInWithAppleButton(
-                    onRequest: { request in
-                        let nonce = randomNonceString()
-                        currentNonce = nonce
-                        request.requestedScopes = [.fullName, .email]
-                        request.nonce = sha256(nonce)
-                    },
-                    onCompletion: { result in
-                        handleSignIn(result: result)
-                    }
-                )
-                .signInWithAppleButtonStyle(.white)
-                .frame(height: 55)
-                .padding(.horizontal, 40)
                 
                 // Modern start button with glassmorphism
                 Button(action: {
@@ -305,115 +293,6 @@ struct AuthenticationView: View {
             self.isAuthenticated = true
             self.isLoading = false
         }
-    }
-    
-    // Nonce 생성 함수
-    private func randomNonceString(length: Int = 32) -> String {
-        precondition(length > 0)
-        let charset: [Character] =
-            Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
-        var result = ""
-        var remainingLength = length
-        
-        while remainingLength > 0 {
-            let randoms: [UInt8] = (0 ..< 16).map { _ in
-                var random: UInt8 = 0
-                let errorCode = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
-                if errorCode != errSecSuccess {
-                    fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
-                }
-                return random
-            }
-            
-            randoms.forEach { random in
-                if remainingLength == 0 {
-                    return
-                }
-                
-                if random < charset.count {
-                    result.append(charset[Int(random)])
-                    remainingLength -= 1
-                }
-            }
-        }
-        
-        return result
-    }
-    
-    // SHA256 해시 함수
-    private func sha256(_ input: String) -> String {
-        let inputData = Data(input.utf8)
-        let hashedData = SHA256.hash(data: inputData)
-        let hashString = hashedData.compactMap {
-            String(format: "%02x", $0)
-        }.joined()
-        
-        return hashString
-    }
-    
-    // Sign In 처리
-    func handleSignIn(result: Result<ASAuthorization, Error>) {
-        isLoading = true
-        
-        switch result {
-        case .success(let authResults):
-            switch authResults.credential {
-            case let appleIDCredential as ASAuthorizationAppleIDCredential:
-                
-                guard let nonce = currentNonce else {
-                    fatalError("Invalid state: A login callback was received, but no login request was sent.")
-                }
-                guard let appleIDToken = appleIDCredential.identityToken else {
-                    print("Unable to fetch identity token")
-                    isLoading = false
-                    return
-                }
-                guard let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
-                    print("Unable to serialize token string from data: \(appleIDToken.debugDescription)")
-                    isLoading = false
-                    return
-                }
-                
-                // Firebase 인증
-                let credential = OAuthProvider.credential(
-                    withProviderID: "apple.com",
-                    idToken: idTokenString,
-                    rawNonce: nonce
-                )
-                
-                Auth.auth().signIn(with: credential) { (authResult, error) in
-                    if let error = error {
-                        print("Firebase 로그인 에러: \(error.localizedDescription)")
-                        isLoading = false
-                        return
-                    }
-                    
-                    print("Firebase 로그인 성공!")
-                    print("User ID: \(authResult?.user.uid ?? "")")
-                    
-                    // 사용자 정보 저장
-                    saveUserData(authResult?.user)
-                    
-                    isAuthenticated = true
-                    isLoading = false
-                }
-                
-            default:
-                break
-            }
-            
-        case .failure(let error):
-            print("Apple Sign In 실패: \(error)")
-            isLoading = false
-        }
-    }
-    
-    // 사용자 데이터 저장
-    func saveUserData(_ user: FirebaseAuth.User?) {
-        guard let user = user else { return }
-        
-        // UserManager를 통해 Firestore에 저장 - loadCurrentUser 사용
-        UserManager.shared.loadCurrentUser(uid: user.uid)
     }
 }
 

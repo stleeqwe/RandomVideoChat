@@ -36,6 +36,7 @@
 		88DFC5C72E416DA800A601E4 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 88DFC5C62E416DA800A601E4 /* FirebaseDatabase */; };
 		88DFC5C92E416DA800A601E4 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 88DFC5C82E416DA800A601E4 /* FirebaseFirestore */; };
 		88DFC5CC2E416F6F00A601E4 /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */; };
+		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +83,7 @@
 		88C07E352E422205004A3F93 /* AgoraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraManager.swift; sourceTree = "<group>"; };
 		88DFC5CA2E416F5100A601E4 /* RandomVideoChat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RandomVideoChat.entitlements; sourceTree = "<group>"; };
 		88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
+		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -155,6 +157,7 @@
 				8871CC7D2E40E5F10096BD2F /* VideoCallView.swift */,
 				8871CC802E40E78A0096BD2F /* CameraView.swift */,
 				88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */,
+				88SET0002E50000001234567 /* SettingsView.swift */,
 				88C07E242E4177A8004A3F93 /* User.swift */,
 				88C07E262E4177C0004A3F93 /* UserManager.swift */,
 				88C07E282E4178D1004A3F93 /* MatchingManager.swift */,
@@ -347,6 +350,7 @@
 				88C07E252E4177A8004A3F93 /* User.swift in Sources */,
 				8871CC7C2E40E5560096BD2F /* MatchingView.swift in Sources */,
 				88DFC5CC2E416F6F00A601E4 /* AuthenticationView.swift in Sources */,
+				88SET0012E50000001234567 /* SettingsView.swift in Sources */,
 				88C07E272E4177C0004A3F93 /* UserManager.swift in Sources */,
 				8871CC782E40E3DE0096BD2F /* SplashView.swift in Sources */,
 			);
@@ -513,7 +517,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";
-				DEVELOPMENT_TEAM = 5ZB9CRJ5SN;
+				DEVELOPMENT_TEAM = M2NT5RFY5P;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RandomVideoChat/Info.plist;
@@ -547,7 +551,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";
-				DEVELOPMENT_TEAM = 5ZB9CRJ5SN;
+				DEVELOPMENT_TEAM = M2NT5RFY5P;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RandomVideoChat/Info.plist;

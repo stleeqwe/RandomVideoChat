@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users 컬렉션 - 사용자 프로필 및 차단 목록
+    match /users/{userId} {
+      // 본인 데이터는 읽기/쓰기 가능
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // 다른 사용자 기본 정보는 읽기만 가능 (매칭용)
+      allow read: if request.auth != null;
+    }
+    
+    // Reports 컬렉션 - 신고 시스템
+    match /reports/{reportId} {
+      // 신고 작성: 인증된 사용자만, 본인이 신고자일 때만 가능
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.reporterUserId
+        && request.resource.data.keys().hasAll(['reportedUserId', 'reporterUserId', 'reason', 'timestamp', 'status'])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reporterUserId is string
+        && request.resource.data.reportedUserId is string
+        && request.resource.data.reason is string;
+      
+      // 신고 읽기: 일반 사용자 불가 (Admin SDK를 통해서만 접근)
+      allow read: if false;
+      
+      // 신고 수정/삭제: 일반 사용자 불가
+      allow update, delete: if false;
+    }
+  }
+}

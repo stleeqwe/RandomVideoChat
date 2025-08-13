@@ -20,6 +20,11 @@ struct VideoCallView: View {
     @State private var isCameraOn = true
     @State private var heartCountAnimation = false
     
+    // 신고/차단 관련 상태
+    @State private var showReportAlert = false
+    @State private var showBlockAlert = false
+    @State private var reportReason = ""
+    
     // 앱 상태 및 백그라운드 감지를 위한 프로퍼티
     @Environment(\.scenePhase) private var scenePhase
     @State private var isBackground = false
@@ -94,20 +99,9 @@ struct VideoCallView: View {
                                 // 카메라 상태를 UserDefaults에 저장
                                 UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
                             }) {
-                                ZStack {
-                                    Image(systemName: "camera.fill")
-                                        .font(.system(size: 28))
-                                        .foregroundColor(.white)
-                                    
-                                    // 카메라 꺼진 상태에서 사선 표시
-                                    if !isCameraOn {
-                                        Rectangle()
-                                            .frame(width: 35, height: 2)
-                                            .foregroundColor(.red)
-                                            .rotationEffect(.degrees(45))
-                                            .offset(x: 0, y: -2)
-                                    }
-                                }
+                                Image(systemName: isCameraOn ? "camera.fill" : "camera")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white)
                             }
                             
                             // 마이크 아이콘
@@ -211,22 +205,49 @@ struct VideoCallView: View {
                 .padding(.bottom, 50)
             }
             
-            // 우측 하단 통화종료 버튼
+            // 우측 하단 통화종료 및 신고/차단 버튼
             VStack {
                 Spacer()
                 
                 HStack {
                     Spacer()
                     
-                    Button(action: endVideoCall) {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 50, height: 50)
-                            .overlay(
-                                Image(systemName: "phone.down.fill")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundColor(.white)
-                            )
+                    VStack(spacing: 15) {
+                        // 신고 버튼
+                        Button(action: { showReportAlert = true }) {
+                            Circle()
+                                .fill(Color.orange)
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white)
+                                )
+                        }
+                        
+                        // 차단 버튼
+                        Button(action: { showBlockAlert = true }) {
+                            Circle()
+                                .fill(Color.gray)
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Image(systemName: "hand.raised.fill")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white)
+                                )
+                        }
+                        
+                        // 통화종료 버튼
+                        Button(action: endVideoCall) {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 50, height: 50)
+                                .overlay(
+                                    Image(systemName: "phone.down.fill")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(.white)
+                                )
+                        }
                     }
                     .padding(.trailing, 40)
                 }
@@ -252,6 +273,21 @@ struct VideoCallView: View {
         }
         .onDisappear {
             onDisappearTasks()
+        }
+        .alert("사용자 신고", isPresented: $showReportAlert) {
+            Button("스팸/광고") { reportUser(reason: "스팸/광고") }
+            Button("부적절한 콘텐츠") { reportUser(reason: "부적절한 콘텐츠") }
+            Button("욕설/괴롭힘") { reportUser(reason: "욕설/괴롭힘") }
+            Button("기타") { reportUser(reason: "기타") }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("이 사용자를 신고하는 이유를 선택해주세요.")
+        }
+        .alert("사용자 차단", isPresented: $showBlockAlert) {
+            Button("차단", role: .destructive) { blockUser() }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("이 사용자를 차단하시겠습니까? 차단된 사용자와는 다시 매칭되지 않습니다.")
         }
     }
     
@@ -513,5 +549,44 @@ struct VideoCallView: View {
 
     func switchCamera() {
         AgoraManager.shared.switchCamera()
+    }
+    
+    // MARK: - Report and Block Functions
+    private func reportUser(reason: String) {
+        guard !opponentUserId.isEmpty else {
+            print("❌ 신고 실패: 상대방 ID가 없음")
+            return
+        }
+        
+        guard let currentUid = Auth.auth().currentUser?.uid else {
+            print("❌ 신고 실패: 현재 사용자 ID가 없음")
+            return
+        }
+        
+        let reportData: [String: Any] = [
+            "reportedUserId": opponentUserId,
+            "reporterUserId": currentUid,
+            "reason": reason,
+            "timestamp": Timestamp(date: Date()),
+            "status": "pending"
+        ]
+        
+        Firestore.firestore().collection("reports").addDocument(data: reportData) { error in
+            if let error = error {
+                print("❌ 신고 실패: \(error.localizedDescription)")
+            } else {
+                print("✅ 신고 완료: \(reason)")
+            }
+        }
+    }
+    
+    private func blockUser() {
+        guard !opponentUserId.isEmpty else {
+            print("❌ 차단 실패: 상대방 ID가 없음")
+            return
+        }
+        
+        UserManager.shared.blockUser(opponentUserId)
+        print("✅ 사용자 차단: \(opponentUserId)")
     }
 }

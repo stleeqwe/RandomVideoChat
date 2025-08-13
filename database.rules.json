@@ -1,0 +1,53 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    
+    "matching_queue": {
+      "$bucket": {
+        ".read": "auth != null",
+        "$userId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId",
+          ".validate": "newData.hasChildren(['gender', 'preferredGender', 'timestamp', 'uid']) && newData.child('uid').val() == auth.uid"
+        }
+      }
+    },
+    
+    "matching_locks": {
+      "$lockKey": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['userId', 'timestamp']) && newData.child('userId').val() == auth.uid"
+      }
+    },
+    
+    "active_matches": {
+      "$matchId": {
+        ".read": "auth != null && (data.child('user1Id').val() == auth.uid || data.child('user2Id').val() == auth.uid)",
+        ".write": "auth != null && (data.child('user1Id').val() == auth.uid || data.child('user2Id').val() == auth.uid || root.child('matching_queue').hasChild(auth.uid))",
+        ".validate": "newData.hasChildren(['user1Id', 'user2Id', 'channelName', 'status']) && (newData.child('user1Id').val() == auth.uid || newData.child('user2Id').val() == auth.uid)"
+      }
+    },
+    
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null",
+        "newHeart": {
+          "$notificationId": {
+            ".validate": "newData.hasChildren(['timestamp', 'from'])"
+          }
+        }
+      }
+    },
+    
+    "user_presence": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId",
+        ".validate": "newData.hasChild('lastSeen')"
+      }
+    }
+  }
+}

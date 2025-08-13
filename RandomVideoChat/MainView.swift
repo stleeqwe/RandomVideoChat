@@ -13,6 +13,7 @@ struct MainView: View {
     @State private var showSwipeHint = true
     @State private var showPermissionAlert = false
     @State private var permissionMessage = ""
+    @State private var showSettings = false
     
     var body: some View {
         ZStack {
@@ -45,6 +46,18 @@ struct MainView: View {
             .ignoresSafeArea()
             
             VStack {
+                // 상단 설정 버튼
+                HStack {
+                    Spacer()
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.top, 50)
+                    .padding(.trailing, 20)
+                }
+                
                 Spacer()
                 
                 HStack {
@@ -84,20 +97,9 @@ struct MainView: View {
                             // 카메라 상태를 UserDefaults에 저장
                             UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
                         }) {
-                            ZStack {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.white)
-                                
-                                // 카메라 꺼진 상태에서 사선 표시
-                                if !isCameraOn {
-                                    Rectangle()
-                                        .frame(width: 35, height: 2)
-                                        .foregroundColor(.red)
-                                        .rotationEffect(.degrees(45))
-                                        .offset(x: 0, y: -2)
-                                }
-                            }
+                            Image(systemName: isCameraOn ? "camera.fill" : "camera")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white)
                         }
                         
                         HStack(spacing: 4) {
@@ -251,6 +253,9 @@ struct MainView: View {
         .fullScreenCover(isPresented: $showMatchingView) {
             MatchingView(isPresented: $showMatchingView)
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
     }
     
     func checkPermissions() {
@@ -335,12 +340,12 @@ struct GenderSelectionView: View {
         VStack(spacing: 8) {
             HStack(spacing: 4) {
                 Text(title)
-                    .font(.custom("Carter One", size: 14))
+                    .font(.custom("GoogleSansCode", size: 14))
                     .foregroundColor(.white)
                 
                 if isRequired {
                     Text("*")
-                        .font(.custom("Carter One", size: 14))
+                        .font(.custom("GoogleSansCode", size: 14))
                         .foregroundColor(.red)
                 }
             }
@@ -362,7 +367,7 @@ struct GenderSelectionView: View {
                             }
                             
                             Text(gender.displayName)
-                                .font(.custom("Carter One", size: 12))
+                                .font(.custom("GoogleSansCode", size: 12))
                                 .foregroundColor(selectedGender == gender ? .white : .white.opacity(0.7))
                         }
                     }
