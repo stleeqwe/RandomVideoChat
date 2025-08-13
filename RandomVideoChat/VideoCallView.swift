@@ -41,15 +41,53 @@ struct VideoCallView: View {
             AgoraVideoView(isLocal: false)
                 .ignoresSafeArea()
             
-            // 상단 그라데이션
+            // 전체 화면 상하단 그라데이션
+            LinearGradient(
+                gradient: Gradient(stops: [
+                    .init(color: Color.black.opacity(0.6), location: 0.0),   // 상단 어두움
+                    .init(color: Color.black.opacity(0.05), location: 0.25), // 상단 중간 밝음
+                    .init(color: Color.clear, location: 0.5),                // 중앙 완전 투명
+                    .init(color: Color.black.opacity(0.05), location: 0.75), // 하단 중간 밝음
+                    .init(color: Color.black.opacity(0.7), location: 1.0)    // 하단 어두움
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            // 상단 좌측 신고/차단 버튼
             VStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.black.opacity(0.6), Color.clear]),
-                    startPoint: .top,
-                    endPoint: .center
-                )
-                .frame(height: 120)
-                .ignoresSafeArea(edges: .top)
+                HStack {
+                    VStack(spacing: 12) {
+                        // 신고 버튼
+                        Button(action: { showReportAlert = true }) {
+                            Circle()
+                                .fill(Color.orange.opacity(0.4))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                )
+                        }
+                        
+                        // 차단 버튼 - 더 직관적인 아이콘으로 변경
+                        Button(action: { showBlockAlert = true }) {
+                            Circle()
+                                .fill(Color.red.opacity(0.4))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Image(systemName: "nosign")
+                                        .font(.system(size: 18, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                )
+                        }
+                    }
+                    .padding(.leading, 20)
+                    .padding(.top, 45)
+                    
+                    Spacer()
+                }
                 
                 Spacer()
             }
@@ -205,49 +243,23 @@ struct VideoCallView: View {
                 .padding(.bottom, 50)
             }
             
-            // 우측 하단 통화종료 및 신고/차단 버튼
+            // 우측 하단 통화종료 버튼
             VStack {
                 Spacer()
                 
                 HStack {
                     Spacer()
                     
-                    VStack(spacing: 15) {
-                        // 신고 버튼
-                        Button(action: { showReportAlert = true }) {
-                            Circle()
-                                .fill(Color.orange)
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white)
-                                )
-                        }
-                        
-                        // 차단 버튼
-                        Button(action: { showBlockAlert = true }) {
-                            Circle()
-                                .fill(Color.gray)
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Image(systemName: "hand.raised.fill")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white)
-                                )
-                        }
-                        
-                        // 통화종료 버튼
-                        Button(action: endVideoCall) {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 50, height: 50)
-                                .overlay(
-                                    Image(systemName: "phone.down.fill")
-                                        .font(.system(size: 20, weight: .medium))
-                                        .foregroundColor(.white)
-                                )
-                        }
+                    // 통화종료 버튼
+                    Button(action: endVideoCall) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 50, height: 50)
+                            .overlay(
+                                Image(systemName: "phone.down.fill")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundColor(.white)
+                            )
                     }
                     .padding(.trailing, 40)
                 }
