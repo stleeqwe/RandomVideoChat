@@ -29,6 +29,7 @@ struct VideoCallView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var isBackground = false
     @State private var backgroundTerminationWorkItem: DispatchWorkItem?
+    @State private var backgroundStartTime: Date?
 
     @StateObject private var userManager = UserManager.shared
     @StateObject private var agoraManager = AgoraManager.shared
@@ -328,9 +329,15 @@ struct VideoCallView: View {
         
         isCallEnding = true
         
-        // 예약된 백그라운드 작업 취소
+        // 백그라운드 타이머 및 상태 완전 정리
         backgroundTerminationWorkItem?.cancel()
         backgroundTerminationWorkItem = nil
+        backgroundStartTime = nil
+        isBackground = false
+        
+        #if DEBUG
+        print("📱 통화 종료 - 백그라운드 관련 상태 모두 초기화")
+        #endif
         
         if signalEnd {
             // 내가 종료하는 경우에만 통화 종료 신호 전송 (matchId 삭제 전에 실행)
@@ -369,26 +376,52 @@ struct VideoCallView: View {
     
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
         if newPhase == .background || newPhase == .inactive {
-            isBackground = true
-            
-            // 기존 타이머가 있다면 취소 후 새로 시작
-            backgroundTerminationWorkItem?.cancel()
-            
-            // 5초 후 통화 종료를 예약
-            let workItem = DispatchWorkItem {
-                if self.isBackground && !self.isCallEnding {
-                    self.cleanupAfterCallEnd(signalEnd: true)
-                    self.presentationMode.wrappedValue.dismiss()
+            // 백그라운드 진입
+            if !isBackground {
+                isBackground = true
+                backgroundStartTime = Date()
+                
+                #if DEBUG
+                print("📱 백그라운드 진입 - 5초 타이머 시작")
+                #endif
+                
+                // 기존 타이머가 있다면 취소 (안전장치)
+                backgroundTerminationWorkItem?.cancel()
+                
+                // 5초 후 통화 종료를 예약
+                let workItem = DispatchWorkItem {
+                    if self.isBackground && !self.isCallEnding {
+                        #if DEBUG
+                        print("📱 백그라운드 5초 경과 - 통화 종료")
+                        #endif
+                        self.cleanupAfterCallEnd(signalEnd: true)
+                        self.presentationMode.wrappedValue.dismiss()
+                    }
                 }
+                backgroundTerminationWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
             }
-            backgroundTerminationWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
             
         } else if newPhase == .active {
-            // 앱이 다시 활성화되면 예약된 작업 취소
-            isBackground = false
-            backgroundTerminationWorkItem?.cancel()
-            backgroundTerminationWorkItem = nil
+            // 앱이 다시 활성화
+            if isBackground {
+                let backgroundDuration = backgroundStartTime.map { Date().timeIntervalSince($0) } ?? 0
+                
+                #if DEBUG
+                print("📱 포어그라운드 복귀 - 백그라운드 소요시간: \(String(format: "%.1f", backgroundDuration))초")
+                #endif
+                
+                isBackground = false
+                backgroundStartTime = nil
+                
+                // 예약된 종료 작업 취소 및 초기화
+                backgroundTerminationWorkItem?.cancel()
+                backgroundTerminationWorkItem = nil
+                
+                #if DEBUG
+                print("📱 백그라운드 타이머 완전 초기화 완료")
+                #endif
+            }
         }
     }
 
