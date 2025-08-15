@@ -32,7 +32,6 @@ class UserManager: ObservableObject {
                 let displayName = data["displayName"] as? String
                 let genderString = data["gender"] as? String ?? ""
                 let preferredGenderString = data["preferredGender"] as? String ?? ""
-                
                 // User 생성 - User의 실제 초기화 함수에 맞게
                 var user = User(uid: uid, email: email, displayName: displayName)
                 user.heartCount = heartCount
@@ -302,5 +301,6 @@ class UserManager: ObservableObject {
             }
         }
     }
+    
     
 }

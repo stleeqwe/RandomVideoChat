@@ -563,31 +563,22 @@ struct VideoCallView: View {
         AgoraManager.shared.switchCamera()
     }
     
-    // MARK: - Report and Block Functions
+    // MARK: - Enhanced Report and Block Functions
     private func reportUser(reason: String) {
         guard !opponentUserId.isEmpty else {
             print("❌ 신고 실패: 상대방 ID가 없음")
             return
         }
         
-        guard let currentUid = Auth.auth().currentUser?.uid else {
-            print("❌ 신고 실패: 현재 사용자 ID가 없음")
-            return
-        }
-        
-        let reportData: [String: Any] = [
-            "reportedUserId": opponentUserId,
-            "reporterUserId": currentUid,
-            "reason": reason,
-            "timestamp": Timestamp(date: Date()),
-            "status": "pending"
-        ]
-        
-        Firestore.firestore().collection("reports").addDocument(data: reportData) { error in
-            if let error = error {
-                print("❌ 신고 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ 신고 완료: \(reason)")
+        ContentModerationManager.shared.reportUser(reportedUserId: opponentUserId, reason: reason) { success in
+            DispatchQueue.main.async {
+                if success {
+                    print("✅ 신고 완료: \(reason)")
+                    // 신고 완료 후 통화 종료
+                    self.endVideoCall()
+                } else {
+                    print("❌ 신고 실패")
+                }
             }
         }
     }
@@ -598,7 +589,11 @@ struct VideoCallView: View {
             return
         }
         
-        UserManager.shared.blockUser(opponentUserId)
-        print("✅ 사용자 차단: \(opponentUserId)")
+        // 강화된 신고 및 차단 (자동 신고 포함)
+        UserManager.shared.reportAndBlockUser(opponentUserId, reason: "사용자 차단")
+        print("✅ 사용자 신고 및 차단: \(opponentUserId)")
+        
+        // 차단 후 즉시 통화 종료
+        endVideoCall()
     }
 }

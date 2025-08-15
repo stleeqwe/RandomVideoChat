@@ -41,6 +41,38 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "gender",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "preferredGender",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "heartCount",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users", 
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "blockedUsers",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "lastMatchAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

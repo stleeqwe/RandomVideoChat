@@ -14,7 +14,7 @@ struct SettingsView: View {
             List {
                 Section {
                     // 이용약관
-                    Link(destination: URL(string: "https://example.com/terms")!) {
+                    Link(destination: URL(string: "https://5sec-terms.web.app/terms")!) {
                         HStack {
                             Image(systemName: "doc.text")
                                 .foregroundColor(.blue)
@@ -26,7 +26,7 @@ struct SettingsView: View {
                     }
                     
                     // 개인정보처리방침
-                    Link(destination: URL(string: "https://example.com/privacy")!) {
+                    Link(destination: URL(string: "https://5sec-terms.web.app/privacy")!) {
                         HStack {
                             Image(systemName: "lock.shield")
                                 .foregroundColor(.blue)
@@ -38,7 +38,7 @@ struct SettingsView: View {
                     }
                     
                     // 문의하기
-                    Link(destination: URL(string: "mailto:support@example.com")!) {
+                    Link(destination: URL(string: "mailto:support@5sec-app.com")!) {
                         HStack {
                             Image(systemName: "envelope")
                                 .foregroundColor(.blue)

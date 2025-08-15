@@ -3,10 +3,14 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Users 컬렉션 - 사용자 프로필 및 차단 목록
     match /users/{userId} {
-      // 본인 데이터는 읽기/쓰기 가능
+      // 본인 데이터는 읽기/쓰기 가능, 연령 확인 필수
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      // 다른 사용자 기본 정보는 읽기만 가능 (매칭용)
-      allow read: if request.auth != null;
+      // 다른 사용자 기본 정보는 읽기만 가능 (매칭용), 단 연령 확인된 사용자만
+      allow read: if request.auth != null && resource.data.isAgeVerified == true;
+      // 새 사용자 생성 시 연령 확인 필수
+      allow create: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.data.isAgeVerified == true;
     }
     
     // Reports 컬렉션 - 신고 시스템
@@ -25,6 +29,27 @@ service cloud.firestore {
       
       // 신고 수정/삭제: 일반 사용자 불가
       allow update, delete: if false;
+    }
+    
+    // Suspensions 컬렉션 - 계정 정지 시스템
+    match /suspensions/{suspensionId} {
+      // 본인의 정지 기록만 읽기 가능
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      
+      // 정지 생성/수정: 시스템에서만 가능 (일반 사용자 불가)
+      allow create, update, delete: if false;
+    }
+    
+    // Matches 컬렉션 - 매칭 기록
+    match /matches/{matchId} {
+      // 매칭 참여자만 읽기/쓰기 가능
+      allow read, write: if request.auth != null 
+        && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
+      
+      // 매칭 생성 시 참여자 검증
+      allow create: if request.auth != null
+        && (request.resource.data.user1Id == request.auth.uid || request.resource.data.user2Id == request.auth.uid)
+        && request.resource.data.keys().hasAll(['user1Id', 'user2Id', 'channelName', 'status', 'createdAt']);
     }
   }
 }

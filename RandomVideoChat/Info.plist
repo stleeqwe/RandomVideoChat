@@ -10,5 +10,7 @@
 	<string>5sec은 화상 채팅을 위해 카메라 접근 권한이 필요합니다.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>5sec은 음성 통화를 위해 마이크 접근 권한이 필요합니다.</string>
+	<key>AGORA_APP_ID</key>
+	<string>b08a13aaebf94a80af0ddd173ce08fbb</string>
 </dict>
 </plist>

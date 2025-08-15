@@ -14,6 +14,7 @@ struct MainView: View {
     @State private var showPermissionAlert = false
     @State private var permissionMessage = ""
     @State private var showSettings = false
+    @State private var showAppleSignInAlert = false
     
     var body: some View {
         ZStack {
@@ -46,9 +47,20 @@ struct MainView: View {
             .ignoresSafeArea()
             
             VStack {
-                // 상단 설정 버튼
+                // 상단 버튼들
                 HStack {
                     Spacer()
+                    
+                    // Apple Sign In 버튼 (미구현)
+                    Button(action: { showAppleSignInAlert = true }) {
+                        Image(systemName: "apple.logo")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.top, 50)
+                    .padding(.trailing, 15)
+                    
+                    // 설정 버튼
                     Button(action: { showSettings = true }) {
                         Image(systemName: "gearshape")
                             .font(.system(size: 24))
@@ -190,11 +202,11 @@ struct MainView: View {
                 .onEnded { value in
                     // 위로 스와이프 감지
                     if value.translation.height < -50 {
-                        print("⬆️ 스와이프 감지 - 성별 확인 중...")
+                        print("⬆️ 스와이프 감지 - 검증 중...")
                         
-                        // 내 성별이 선택되어야만 매칭 시작
+                        // 성별 선택 확인
                         if userManager.currentUser?.gender != nil {
-                            print("✅ 성별 선택 완료 - 매칭 화면 표시")
+                            print("✅ 모든 조건 충족 - 매칭 화면 표시")
                             showMatchingView = true
                         } else {
                             print("❌ 성별 선택 필요 - 알림 표시")
@@ -219,6 +231,11 @@ struct MainView: View {
                       }),
                       secondaryButton: .cancel(Text("닫기")))
             }
+        }
+        .alert("Apple Sign In", isPresented: $showAppleSignInAlert) {
+            Button("확인") { }
+        } message: {
+            Text("Apple Sign In 기능은 현재 개발 중입니다. 곧 업데이트될 예정입니다.")
         }
         .onAppear {
             // 저장된 카메라 상태 복원

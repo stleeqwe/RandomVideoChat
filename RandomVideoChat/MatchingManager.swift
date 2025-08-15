@@ -24,6 +24,12 @@ class MatchingManager: ObservableObject {
         setupPresenceTracking()
     }
     
+    deinit {
+        cleanupAllObservers()
+        NotificationCenter.default.removeObserver(self)
+        print("🧹 MatchingManager 메모리 정리 완료")
+    }
+    
     // MARK: - Presence Tracking
     private func setupPresenceTracking() {
         // 앱이 백그라운드로 가거나 종료될 때 처리
@@ -834,5 +840,24 @@ class MatchingManager: ObservableObject {
             database.reference().removeObserver(withHandle: handle)
             timerHandle = nil
         }
+    }
+    
+    // MARK: - Memory Management
+    private func cleanupAllObservers() {
+        // 모든 Firebase 옵저버 정리
+        if let handle = matchingHandle {
+            database.reference().removeObserver(withHandle: handle)
+            matchingHandle = nil
+        }
+        
+        if let handle = statusHandle {
+            database.reference().removeObserver(withHandle: handle)
+            statusHandle = nil
+        }
+        
+        // 통화 관련 옵저버 정리
+        cleanupCallObservers()
+        
+        print("🧹 MatchingManager 모든 옵저버 정리 완료")
     }
 }

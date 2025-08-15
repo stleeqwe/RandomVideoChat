@@ -1,7 +1,6 @@
 import SwiftUI
-import AuthenticationServices
 import FirebaseAuth
-import CryptoKit
+import FirebaseFirestore
 
 @available(iOS 15.0, *)
 struct AuthenticationView: View {
@@ -188,7 +187,7 @@ struct AuthenticationView: View {
                                 )
                             )
                         
-                        Text("익명으로 시작하기")
+                        Text("익명으로 안전하게 시작하기")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.white.opacity(0.7))
                             .padding(.top, 8)
@@ -198,7 +197,7 @@ struct AuthenticationView: View {
                 
                 Spacer()
                 
-                // Modern start button with glassmorphism
+                // 익명 로그인 버튼
                 Button(action: {
                     print("익명 로그인 시도")
                     signInAnonymously()

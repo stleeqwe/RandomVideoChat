@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.myapp.RandomVideoChat</string>
+	<string>com.pushkiinn.RandomVideoChat</string>
 	<key>PROJECT_ID</key>
 	<string>random-video-chat-98e0a</string>
 	<key>STORAGE_BUCKET</key>

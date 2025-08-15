@@ -37,6 +37,10 @@
 		88DFC5C92E416DA800A601E4 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 88DFC5C82E416DA800A601E4 /* FirebaseFirestore */; };
 		88DFC5CC2E416F6F00A601E4 /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */; };
 		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
+		88MOD0012E60000001234567 /* ContentModerationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MOD0002E60000001234567 /* ContentModerationManager.swift */; };
+		88PER0012E70000001234567 /* PerformanceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88PER0002E70000001234567 /* PerformanceMonitor.swift */; };
+		88MEM0012E70000001234567 /* MemoryLeakDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MEM0002E70000001234567 /* MemoryLeakDetector.swift */; };
+		88IMG0012E70000001234567 /* ImageCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88IMG0002E70000001234567 /* ImageCacheManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,9 +85,12 @@
 		88C07E282E4178D1004A3F93 /* MatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchingManager.swift; sourceTree = "<group>"; };
 		88C07E332E4220B1004A3F93 /* AgoraVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraVideoView.swift; sourceTree = "<group>"; };
 		88C07E352E422205004A3F93 /* AgoraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraManager.swift; sourceTree = "<group>"; };
-		88DFC5CA2E416F5100A601E4 /* RandomVideoChat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RandomVideoChat.entitlements; sourceTree = "<group>"; };
 		88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
 		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		88MOD0002E60000001234567 /* ContentModerationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModerationManager.swift; sourceTree = "<group>"; };
+		88PER0002E70000001234567 /* PerformanceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMonitor.swift; sourceTree = "<group>"; };
+		88MEM0002E70000001234567 /* MemoryLeakDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLeakDetector.swift; sourceTree = "<group>"; };
+		88IMG0002E70000001234567 /* ImageCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,7 +151,6 @@
 			children = (
 				8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */,
 				883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */,
-				88DFC5CA2E416F5100A601E4 /* RandomVideoChat.entitlements */,
 				8871CC7F2E40E7380096BD2F /* Info.plist */,
 				8871CC742E40DEF60096BD2F /* GoogleService-Info.plist */,
 				8871CC4A2E40DAB90096BD2F /* RandomVideoChatApp.swift */,
@@ -158,6 +164,10 @@
 				8871CC802E40E78A0096BD2F /* CameraView.swift */,
 				88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */,
 				88SET0002E50000001234567 /* SettingsView.swift */,
+				88MOD0002E60000001234567 /* ContentModerationManager.swift */,
+				88PER0002E70000001234567 /* PerformanceMonitor.swift */,
+				88MEM0002E70000001234567 /* MemoryLeakDetector.swift */,
+				88IMG0002E70000001234567 /* ImageCacheManager.swift */,
 				88C07E242E4177A8004A3F93 /* User.swift */,
 				88C07E262E4177C0004A3F93 /* UserManager.swift */,
 				88C07E282E4178D1004A3F93 /* MatchingManager.swift */,
@@ -351,6 +361,10 @@
 				8871CC7C2E40E5560096BD2F /* MatchingView.swift in Sources */,
 				88DFC5CC2E416F6F00A601E4 /* AuthenticationView.swift in Sources */,
 				88SET0012E50000001234567 /* SettingsView.swift in Sources */,
+				88MOD0012E60000001234567 /* ContentModerationManager.swift in Sources */,
+				88PER0012E70000001234567 /* PerformanceMonitor.swift in Sources */,
+				88MEM0012E70000001234567 /* MemoryLeakDetector.swift in Sources */,
+				88IMG0012E70000001234567 /* ImageCacheManager.swift in Sources */,
 				88C07E272E4177C0004A3F93 /* UserManager.swift in Sources */,
 				8871CC782E40E3DE0096BD2F /* SplashView.swift in Sources */,
 			);
@@ -513,7 +527,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = RandomVideoChat/RandomVideoChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";
@@ -547,7 +560,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = RandomVideoChat/RandomVideoChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";

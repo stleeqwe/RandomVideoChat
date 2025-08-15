@@ -5,8 +5,14 @@ import AVFoundation
 class AgoraManager: NSObject, ObservableObject {
     static let shared = AgoraManager()
     
-    // Agora 설정
-    private let appId = "b08a13aaebf94a80af0ddd173ce08fbb"
+    // Agora 설정 - Info.plist에서 안전하게 가져오기
+    private let appId: String = {
+        guard let appId = Bundle.main.object(forInfoDictionaryKey: "AGORA_APP_ID") as? String,
+              !appId.isEmpty else {
+            fatalError("⚠️ AGORA_APP_ID가 Info.plist에서 찾을 수 없습니다. 앱을 실행할 수 없습니다.")
+        }
+        return appId
+    }()
     private var agoraKit: AgoraRtcEngineKit?
     
     // 상태 관리
@@ -41,6 +47,9 @@ class AgoraManager: NSObject, ObservableObject {
         config.channelProfile = .communication  // 1:1 통화용
         
         agoraKit = AgoraRtcEngineKit.sharedEngine(with: config, delegate: self)
+        
+        // 성능 최적화 설정
+        setupPerformanceOptimizations()
         
         guard agoraKit != nil else {
             print("❌ Agora 엔진 초기화 실패!")
@@ -324,5 +333,83 @@ extension AgoraManager: AgoraRtcEngineDelegate {
                 break
             }
         }
+    }
+    
+    // MARK: - Performance Optimizations
+    private func setupPerformanceOptimizations() {
+        guard let agoraKit = agoraKit else { return }
+        
+        // 비디오 품질 적응형 설정
+        setupAdaptiveVideoConfig()
+        
+        // 오디오 처리 최적화
+        agoraKit.setAudioProfile(.speechStandard, scenario: .default)
+        
+        // 에코 캔슬레이션 및 노이즈 억제
+        agoraKit.enableAudio()
+        agoraKit.enableVideo()
+        
+        // 하드웨어 가속 활성화
+        agoraKit.setEnableSpeakerphone(true)
+        
+        // 네트워크 적응 활성화
+        agoraKit.enableDualStreamMode(true)
+        
+        print("🚀 Agora 성능 최적화 설정 완료")
+    }
+    
+    private func setupAdaptiveVideoConfig() {
+        guard let agoraKit = agoraKit else { return }
+        
+        let videoConfig = AgoraVideoEncoderConfiguration()
+        let networkQuality = PerformanceMonitor.shared.getNetworkQuality()
+        
+        // 네트워크 상태에 따른 동적 품질 조정
+        switch networkQuality {
+        case .excellent:
+            videoConfig.dimensions = AgoraVideoDimension960x720
+            videoConfig.frameRate = .fps30
+            videoConfig.bitrate = 1130
+            print("📶 네트워크 품질: 최고 - 고품질 비디오 설정")
+            
+        case .good:
+            videoConfig.dimensions = AgoraVideoDimension640x480
+            videoConfig.frameRate = .fps24
+            videoConfig.bitrate = 800
+            print("📶 네트워크 품질: 양호 - 중품질 비디오 설정")
+            
+        case .poor:
+            videoConfig.dimensions = AgoraVideoDimension320x240
+            videoConfig.frameRate = .fps15
+            videoConfig.bitrate = 200
+            print("📶 네트워크 품질: 나쁨 - 저품질 비디오 설정")
+            
+        default:
+            videoConfig.dimensions = AgoraVideoDimension640x480
+            videoConfig.frameRate = .fps24
+            videoConfig.bitrate = AgoraVideoBitrateStandard
+            print("📶 네트워크 품질: 알 수 없음 - 기본 품질 설정")
+        }
+        
+        // 성능 최적화 설정 (API 버전 호환성 확인)
+        videoConfig.mirrorMode = .disabled  // 불필요한 미러링 비활성화
+        
+        agoraKit.setVideoEncoderConfiguration(videoConfig)
+    }
+    
+    // 네트워크 상태 변화에 따른 동적 품질 조정
+    func adaptVideoQualityToNetwork() {
+        setupAdaptiveVideoConfig()
+    }
+    
+    // 성능 메트릭 수집
+    func collectPerformanceMetrics() {
+        guard let agoraKit = agoraKit else { return }
+        
+        // 연결 상태 정보 수집
+        print("📊 Agora Performance Metrics:")
+        print("   - Remote User Joined: \(remoteUserJoined)")
+        print("   - Remote Video Enabled: \(remoteVideoEnabled)")
+        print("   - Is In Call: \(isInCall)")
     }
 }

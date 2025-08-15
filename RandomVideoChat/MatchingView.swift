@@ -250,7 +250,18 @@ struct MatchingView: View {
     
     private func startMatchingIfNeeded() {
         if !matchingManager.isMatching && !matchingManager.isMatched {
-            matchingManager.startMatching()
+            // 콘텐츠 안전성 검사 후 매칭 시작
+            UserManager.shared.checkContentSafety { isAllowed, errorMessage in
+                DispatchQueue.main.async {
+                    if isAllowed {
+                        self.matchingManager.startMatching()
+                    } else {
+                        // 안전성 검사 실패 시 매칭 중단하고 메인으로 돌아가기
+                        print("❌ 콘텐츠 안전성 검사 실패: \(errorMessage ?? "알 수 없는 오류")")
+                        self.isPresented = false
+                    }
+                }
+            }
         }
     }
     
