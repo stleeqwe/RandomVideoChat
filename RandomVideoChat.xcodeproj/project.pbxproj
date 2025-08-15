@@ -36,11 +36,11 @@
 		88DFC5C72E416DA800A601E4 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 88DFC5C62E416DA800A601E4 /* FirebaseDatabase */; };
 		88DFC5C92E416DA800A601E4 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 88DFC5C82E416DA800A601E4 /* FirebaseFirestore */; };
 		88DFC5CC2E416F6F00A601E4 /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */; };
-		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
+		88IMG0012E70000001234567 /* ImageCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88IMG0002E70000001234567 /* ImageCacheManager.swift */; };
+		88MEM0012E70000001234567 /* MemoryLeakDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MEM0002E70000001234567 /* MemoryLeakDetector.swift */; };
 		88MOD0012E60000001234567 /* ContentModerationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MOD0002E60000001234567 /* ContentModerationManager.swift */; };
 		88PER0012E70000001234567 /* PerformanceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88PER0002E70000001234567 /* PerformanceMonitor.swift */; };
-		88MEM0012E70000001234567 /* MemoryLeakDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MEM0002E70000001234567 /* MemoryLeakDetector.swift */; };
-		88IMG0012E70000001234567 /* ImageCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88IMG0002E70000001234567 /* ImageCacheManager.swift */; };
+		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,11 +86,11 @@
 		88C07E332E4220B1004A3F93 /* AgoraVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraVideoView.swift; sourceTree = "<group>"; };
 		88C07E352E422205004A3F93 /* AgoraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraManager.swift; sourceTree = "<group>"; };
 		88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
-		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		88IMG0002E70000001234567 /* ImageCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheManager.swift; sourceTree = "<group>"; };
+		88MEM0002E70000001234567 /* MemoryLeakDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLeakDetector.swift; sourceTree = "<group>"; };
 		88MOD0002E60000001234567 /* ContentModerationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModerationManager.swift; sourceTree = "<group>"; };
 		88PER0002E70000001234567 /* PerformanceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMonitor.swift; sourceTree = "<group>"; };
-		88MEM0002E70000001234567 /* MemoryLeakDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLeakDetector.swift; sourceTree = "<group>"; };
-		88IMG0002E70000001234567 /* ImageCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheManager.swift; sourceTree = "<group>"; };
+		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -530,7 +530,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";
-				DEVELOPMENT_TEAM = M2NT5RFY5P;
+				DEVELOPMENT_TEAM = W4T837AHL3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RandomVideoChat/Info.plist;
@@ -547,7 +547,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pushkiinn.RandomVideoChat;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pukaworks.5sec;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -563,7 +563,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";
-				DEVELOPMENT_TEAM = M2NT5RFY5P;
+				DEVELOPMENT_TEAM = W4T837AHL3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RandomVideoChat/Info.plist;
@@ -580,7 +580,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pushkiinn.RandomVideoChat;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pukaworks.5sec;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
