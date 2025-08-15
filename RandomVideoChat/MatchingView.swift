@@ -13,6 +13,10 @@ struct MatchingView: View {
     @State private var showSwipeHint = true
     @State private var dotTimer: Timer?
     
+    // 백그라운드 상태 관리
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isInBackground = false
+    
     var body: some View {
         ZStack {
             // Enhanced purple gradient background
@@ -241,6 +245,9 @@ struct MatchingView: View {
                 showMatchedAnimation = false
             }
         }
+        .onChange(of: scenePhase) { newPhase in
+            handleScenePhaseChange(newPhase)
+        }
         .fullScreenCover(isPresented: $navigateToVideoCall, onDismiss: {
             resetMatchingState()
         }) {
@@ -287,6 +294,37 @@ struct MatchingView: View {
         // MatchingManager 상태도 확인하여 필요시 리셋
         if matchingManager.isMatched && !matchingManager.isMatching {
             matchingManager.cancelMatching()
+        }
+    }
+    
+    // MARK: - Background Handling
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        switch newPhase {
+        case .background, .inactive:
+            if !isInBackground {
+                isInBackground = true
+                #if DEBUG
+                print("📱 매칭 화면 - 백그라운드 진입: 매칭 큐에서 제거")
+                #endif
+                // 백그라운드로 갈 때 매칭 취소 (큐에서 제거)
+                if matchingManager.isMatching {
+                    matchingManager.cancelMatching()
+                }
+            }
+        case .active:
+            if isInBackground {
+                isInBackground = false
+                #if DEBUG
+                print("📱 매칭 화면 - 포어그라운드 복귀: 매칭 재시작")
+                #endif
+                // 포어그라운드로 돌아오면 매칭 다시 시작
+                // 단, 이미 매칭된 상태가 아닐 때만
+                if !matchingManager.isMatched && !navigateToVideoCall {
+                    startMatchingIfNeeded()
+                }
+            }
+        default:
+            break
         }
     }
     

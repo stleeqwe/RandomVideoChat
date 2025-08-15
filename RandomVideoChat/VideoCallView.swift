@@ -382,24 +382,24 @@ struct VideoCallView: View {
                 backgroundStartTime = Date()
                 
                 #if DEBUG
-                print("📱 백그라운드 진입 - 5초 타이머 시작")
+                print("📱 백그라운드 진입 - 30초 타이머 시작")
                 #endif
                 
                 // 기존 타이머가 있다면 취소 (안전장치)
                 backgroundTerminationWorkItem?.cancel()
                 
-                // 5초 후 통화 종료를 예약
+                // 30초 후 통화 종료를 예약
                 let workItem = DispatchWorkItem {
                     if self.isBackground && !self.isCallEnding {
                         #if DEBUG
-                        print("📱 백그라운드 5초 경과 - 통화 종료")
+                        print("📱 백그라운드 30초 경과 - 통화 종료")
                         #endif
                         self.cleanupAfterCallEnd(signalEnd: true)
                         self.presentationMode.wrappedValue.dismiss()
                     }
                 }
                 backgroundTerminationWorkItem = workItem
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: workItem)
             }
             
         } else if newPhase == .active {
