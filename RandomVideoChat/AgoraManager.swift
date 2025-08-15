@@ -38,8 +38,10 @@ class AgoraManager: NSObject, ObservableObject {
     
     // MARK: - Agora 엔진 설정
     private func setupAgoraEngine() {
+        #if DEBUG
         print("🔧 Agora 엔진 초기화 시작")
         print("📱 App ID: \(appId)")  // 🆕 App ID 확인
+        #endif
         
         // 엔진 초기화
         let config = AgoraRtcEngineConfig()
@@ -52,15 +54,21 @@ class AgoraManager: NSObject, ObservableObject {
         setupPerformanceOptimizations()
         
         guard agoraKit != nil else {
+            #if DEBUG
             print("❌ Agora 엔진 초기화 실패!")
+            #endif
             return
         }
         
+        #if DEBUG
         print("✅ Agora 엔진 초기화 성공")
+        #endif
         
         // 🆕 중요: 클라이언트 역할을 명시적으로 설정
         agoraKit?.setClientRole(.broadcaster)
+        #if DEBUG
         print("✅ 클라이언트 역할: broadcaster")
+        #endif
         
         // 🆕 중요: 기본 오디오 라우트 설정
         agoraKit?.setDefaultAudioRouteToSpeakerphone(true)
@@ -116,19 +124,25 @@ class AgoraManager: NSObject, ObservableObject {
     
     // MARK: - 통화 시작
     func startCall(channel: String) {
+        #if DEBUG
         print("📱 AgoraManager: startCall - 채널: \(channel)")
         print("📱 채널 길이: \(channel.count) (최대 64자)")
         print("📱 App ID: \(appId)")  // 🆕 App ID 확인
+        #endif
         
         // 채널 이름 유효성 검사
         guard channel.count <= 64 && !channel.isEmpty else {
+            #if DEBUG
             print("❌ 유효하지 않은 채널 이름! (\(channel.count)자)")
+            #endif
             return
         }
         
         // 엔진 상태 확인
         guard let engine = agoraKit else {
+            #if DEBUG
             print("❌ Agora 엔진이 초기화되지 않았습니다")
+            #endif
             setupAgoraEngine()
             
             // 🆕 재시도
@@ -153,8 +167,12 @@ class AgoraManager: NSObject, ObservableObject {
         options.channelProfile = .communication  // 🆕 1:1 통화 명시
         
         // 채널 참가
+        // TODO: 프로덕션 배포 시 보안 개선 필요
+        // - 서버에서 동적 토큰 발급 구현
+        // - 토큰 만료 시간 관리 (24시간 권장)
+        // - 토큰 갱신 로직 추가
         let result = engine.joinChannel(
-            byToken: nil,  // 토큰 없이 연결 (테스트 모드)
+            byToken: nil,  // 현재는 테스트 모드 (프로덕션에서는 서버 발급 토큰 사용)
             channelId: channel,
             uid: 0,  // 0은 Agora가 자동으로 UID 할당
             mediaOptions: options

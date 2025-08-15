@@ -40,7 +40,9 @@ class UserManager: ObservableObject {
                 user.preferredGender = Gender(rawValue: preferredGenderString)
                 self?.currentUser = user
                 
+                #if DEBUG
                 print("✅ 사용자 데이터 로드 완료: \(heartCount) 하트")
+                #endif
             } else {
                 // 사용자 문서가 없으면 생성
                 self?.createUserDocument(uid: uid)
@@ -60,9 +62,13 @@ class UserManager: ObservableObject {
             if error == nil {
                 let user = User(uid: uid) // User의 초기화 함수는 기본값을 자동 설정
                 self?.currentUser = user
+                #if DEBUG
                 print("✅ 새 사용자 문서 생성 완료")
+                #endif
             } else {
+                #if DEBUG
                 print("❌ 사용자 문서 생성 실패: \(error?.localizedDescription ?? "")")
+                #endif
             }
         }
     }

@@ -3,10 +3,12 @@ import AgoraRtcKit
 
 struct AgoraVideoView: UIViewRepresentable {
     let isLocal: Bool
-    @StateObject private var agoraManager = AgoraManager.shared
+    @ObservedObject private var agoraManager = AgoraManager.shared
     
     func makeUIView(context: Context) -> UIView {
+        #if DEBUG
         print("🎥 AgoraVideoView 생성: \(isLocal ? "로컬" : "원격")")
+        #endif
         
         let view = UIView()
         view.backgroundColor = .black
@@ -29,10 +31,14 @@ struct AgoraVideoView: UIViewRepresentable {
         
         if isLocal {
             videoView = agoraManager.localVideoView
+            #if DEBUG
             print("📹 로컬 비디오 뷰 업데이트")
+            #endif
         } else {
             videoView = agoraManager.remoteVideoView
+            #if DEBUG
             print("📹 원격 비디오 뷰 업데이트: \(agoraManager.remoteUserJoined ? "연결됨" : "대기중")")
+            #endif
         }
         
         // 카메라가 꺼져있는지 확인
