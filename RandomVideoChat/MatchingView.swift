@@ -9,8 +9,8 @@ struct MatchingView: View {
     @State private var pulseAnimation = false
     @State private var navigateToVideoCall = false
     @State private var showMatchedAnimation = false
-    @State private var swipeOffset: CGFloat = 0
-    @State private var showSwipeHint = true
+    @State private var swipeOffset: CGFloat = -15
+    @State private var showSwipeHint = false
     @State private var dotTimer: Timer?
     
     // 백그라운드 상태 관리
@@ -194,20 +194,24 @@ struct MatchingView: View {
                     }
                     .padding(.bottom, 70)
                     .onAppear {
+                        // 매칭 화면 진입 시 상태 초기화
+                        swipeOffset = -15
+                        showSwipeHint = false
+                        
                         // Enhanced floating animation (downward)
                         withAnimation(
                             .easeInOut(duration: 2.0)
                                 .repeatForever(autoreverses: true)
                         ) {
-                            swipeOffset = 15  // Positive value for downward movement
+                            swipeOffset = 15  // -15 → +15 사이를 계속 왕복
                         }
                         
                         // Pulsing hint animation
                         withAnimation(
-                            .easeInOut(duration: 3.0)
+                            .easeInOut(duration: 1.5)
                                 .repeatForever(autoreverses: true)
                         ) {
-                            showSwipeHint.toggle()
+                            showSwipeHint = true  // false → true 사이를 계속 왕복
                         }
                     }
                 }
@@ -291,6 +295,10 @@ struct MatchingView: View {
         navigateToVideoCall = false
         showMatchedAnimation = false
         
+        // 스와이프 애니메이션 상태 초기화
+        swipeOffset = -15
+        showSwipeHint = false
+        
         // MatchingManager 상태도 확인하여 필요시 리셋
         if matchingManager.isMatched && !matchingManager.isMatching {
             matchingManager.cancelMatching()
@@ -320,6 +328,10 @@ struct MatchingView: View {
                 // 포어그라운드로 돌아오면 매칭 다시 시작
                 // 단, 이미 매칭된 상태가 아닐 때만
                 if !matchingManager.isMatched && !navigateToVideoCall {
+                    // 스와이프 애니메이션 상태 초기화
+                    swipeOffset = -15
+                    showSwipeHint = false
+                    
                     startMatchingIfNeeded()
                 }
             }
