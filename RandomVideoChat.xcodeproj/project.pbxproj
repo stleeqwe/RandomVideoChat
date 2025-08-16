@@ -41,6 +41,7 @@
 		88MOD0012E60000001234567 /* ContentModerationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MOD0002E60000001234567 /* ContentModerationManager.swift */; };
 		88PER0012E70000001234567 /* PerformanceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88PER0002E70000001234567 /* PerformanceMonitor.swift */; };
 		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
+		88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SWP0002E80000001234567 /* SwipeHintView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,6 +92,7 @@
 		88MOD0002E60000001234567 /* ContentModerationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModerationManager.swift; sourceTree = "<group>"; };
 		88PER0002E70000001234567 /* PerformanceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMonitor.swift; sourceTree = "<group>"; };
 		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		88SWP0002E80000001234567 /* SwipeHintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeHintView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,6 +175,7 @@
 				88C07E282E4178D1004A3F93 /* MatchingManager.swift */,
 				88C07E332E4220B1004A3F93 /* AgoraVideoView.swift */,
 				88C07E352E422205004A3F93 /* AgoraManager.swift */,
+				88SWP0002E80000001234567 /* SwipeHintView.swift */,
 			);
 			path = RandomVideoChat;
 			sourceTree = "<group>";
@@ -367,6 +370,7 @@
 				88IMG0012E70000001234567 /* ImageCacheManager.swift in Sources */,
 				88C07E272E4177C0004A3F93 /* UserManager.swift in Sources */,
 				8871CC782E40E3DE0096BD2F /* SplashView.swift in Sources */,
+				88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
