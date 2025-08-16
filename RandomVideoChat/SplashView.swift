@@ -47,6 +47,7 @@ struct SplashView: View {
             }
             .scaleEffect(logoScale)
             .opacity(logoOpacity)
+            .offset(y: -30)
         }
         .onAppear {
             // 🔍 설치된 폰트 확인 (디버깅용)
