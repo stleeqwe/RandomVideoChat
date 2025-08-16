@@ -9,9 +9,10 @@ struct MatchingView: View {
     @State private var pulseAnimation = false
     @State private var navigateToVideoCall = false
     @State private var showMatchedAnimation = false
-    @State private var swipeOffset: CGFloat = -15
-    @State private var showSwipeHint = false
+    @State private var swipeOffset: CGFloat = 0
+    @State private var showSwipeHint = true
     @State private var dotTimer: Timer?
+    @State private var swipeHintTimer: Timer?
     
     // 백그라운드 상태 관리
     @Environment(\.scenePhase) private var scenePhase
@@ -194,25 +195,7 @@ struct MatchingView: View {
                     }
                     .padding(.bottom, 70)
                     .onAppear {
-                        // 매칭 화면 진입 시 상태 초기화
-                        swipeOffset = -15
-                        showSwipeHint = false
-                        
-                        // Enhanced floating animation (downward)
-                        withAnimation(
-                            .easeInOut(duration: 2.0)
-                                .repeatForever(autoreverses: true)
-                        ) {
-                            swipeOffset = 15  // -15 → +15 사이를 계속 왕복
-                        }
-                        
-                        // Pulsing hint animation
-                        withAnimation(
-                            .easeInOut(duration: 1.5)
-                                .repeatForever(autoreverses: true)
-                        ) {
-                            showSwipeHint = true  // false → true 사이를 계속 왕복
-                        }
+                        startSwipeAnimation()
                     }
                 }
             }
@@ -288,6 +271,9 @@ struct MatchingView: View {
     private func stopDotAnimation() {
         dotTimer?.invalidate()
         dotTimer = nil
+        
+        // 스와이프 애니메이션도 정리
+        stopSwipeAnimation()
     }
     
     private func resetMatchingState() {
@@ -295,9 +281,8 @@ struct MatchingView: View {
         navigateToVideoCall = false
         showMatchedAnimation = false
         
-        // 스와이프 애니메이션 상태 초기화
-        swipeOffset = -15
-        showSwipeHint = false
+        // 스와이프 애니메이션 재시작
+        startSwipeAnimation()
         
         // MatchingManager 상태도 확인하여 필요시 리셋
         if matchingManager.isMatched && !matchingManager.isMatching {
@@ -328,9 +313,8 @@ struct MatchingView: View {
                 // 포어그라운드로 돌아오면 매칭 다시 시작
                 // 단, 이미 매칭된 상태가 아닐 때만
                 if !matchingManager.isMatched && !navigateToVideoCall {
-                    // 스와이프 애니메이션 상태 초기화
-                    swipeOffset = -15
-                    showSwipeHint = false
+                    // 스와이프 애니메이션 재시작
+                    startSwipeAnimation()
                     
                     startMatchingIfNeeded()
                 }
@@ -338,6 +322,36 @@ struct MatchingView: View {
         default:
             break
         }
+    }
+    
+    // MARK: - Swipe Animation
+    private func startSwipeAnimation() {
+        // 기존 타이머 정리
+        swipeHintTimer?.invalidate()
+        
+        // 매칭 화면 진입 시 상태 초기화 (기존 초기값으로)
+        swipeOffset = 0
+        showSwipeHint = true
+        
+        // Enhanced floating animation (downward) - 기존 방식
+        withAnimation(
+            .easeInOut(duration: 2.0)
+                .repeatForever(autoreverses: true)
+        ) {
+            swipeOffset = 15  // Positive value for downward movement
+        }
+        
+        // Timer를 사용한 주기적 토글 애니메이션
+        swipeHintTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 1.5)) {
+                showSwipeHint.toggle()
+            }
+        }
+    }
+    
+    private func stopSwipeAnimation() {
+        swipeHintTimer?.invalidate()
+        swipeHintTimer = nil
     }
     
 }
