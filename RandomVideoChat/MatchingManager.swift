@@ -79,6 +79,21 @@ class MatchingManager: ObservableObject {
             return
         }
         
+        // 연령 확인 검증 (Apple Sign In 사용자의 경우)
+        if let currentUser = UserManager.shared.currentUser {
+            if currentUser.authProvider == "apple.com" && !currentUser.ageVerified {
+                print("❌ 연령 확인이 필요한 사용자 - 매칭 중단")
+                isMatching = false
+                return
+            }
+            
+            if let age = currentUser.age, age < 18 {
+                print("❌ 연령 미달 사용자 - 매칭 중단")
+                isMatching = false
+                return
+            }
+        }
+        
         let currentUserId = Auth.auth().currentUser?.uid ?? "testUser_\(UUID().uuidString.prefix(8))"
 
         // 상태 초기화
@@ -327,7 +342,7 @@ class MatchingManager: ObservableObject {
                     
                     for child in snapshot.children {
                         guard let snap = child as? DataSnapshot,
-                              var dict = snap.value as? [String: Any] else { 
+                              let dict = snap.value as? [String: Any] else { 
                             print("❌ 스냅샷 파싱 실패")
                             continue 
                         }
@@ -381,8 +396,9 @@ class MatchingManager: ObservableObject {
                         }
                         
                         print("   ✅ 후보로 선정 - candidates에 추가 중...")
-                        dict["userId"] = userId
-                        candidates.append(dict)
+                        var candidateDict = dict
+                        candidateDict["userId"] = userId
+                        candidates.append(candidateDict)
                         print("   ✅ candidates 추가 완료, 현재 개수: \(candidates.count)")
                     }
                     
@@ -461,7 +477,7 @@ class MatchingManager: ObservableObject {
                 return
             }
             
-            guard var dict = snapshot.value as? [String: Any] else {
+            guard let dict = snapshot.value as? [String: Any] else {
                 print("🚫 상대방 데이터 형식 오류. 다음 후보로 넘어갑니다.")
                 self.tryLockAndFinalize(currentUserId: currentUserId,
                                         myGender: myGender,

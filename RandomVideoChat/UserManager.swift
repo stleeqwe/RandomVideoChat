@@ -32,12 +32,19 @@ class UserManager: ObservableObject {
                 let displayName = data["displayName"] as? String
                 let genderString = data["gender"] as? String ?? ""
                 let preferredGenderString = data["preferredGender"] as? String ?? ""
+                let ageVerified = data["ageVerified"] as? Bool ?? false
+                let authProvider = data["authProvider"] as? String ?? "anonymous"
+                let birthDateTimestamp = data["birthDate"] as? Timestamp
+                
                 // User 생성 - User의 실제 초기화 함수에 맞게
                 var user = User(uid: uid, email: email, displayName: displayName)
                 user.heartCount = heartCount
                 user.blockedUsers = blockedUsers
                 user.gender = Gender(rawValue: genderString)
                 user.preferredGender = Gender(rawValue: preferredGenderString)
+                user.ageVerified = ageVerified
+                user.authProvider = authProvider
+                user.birthDate = birthDateTimestamp?.dateValue()
                 self?.currentUser = user
                 
                 #if DEBUG
@@ -115,7 +122,7 @@ class UserManager: ObservableObject {
         heartListener?.remove()
         
         heartListener = db.collection("users").document(uid)
-            .addSnapshotListener { [weak self] documentSnapshot, error in
+            .addSnapshotListener { documentSnapshot, error in
                 guard let document = documentSnapshot,
                       let data = document.data(),
                       let heartCount = data["heartCount"] as? Int else {
@@ -275,36 +282,67 @@ class UserManager: ObservableObject {
     func updateGender(_ gender: Gender) {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         
-        db.collection("users").document(uid).updateData([
-            "gender": gender.rawValue
-        ]) { [weak self] error in
-            if error == nil {
-                self?.currentUser?.gender = gender
-                print("✅ 성별 업데이트 완료: \(gender.displayName)")
-            } else {
-                print("❌ 성별 업데이트 실패: \(error?.localizedDescription ?? "")")
-            }
+        // 먼저 로컬 상태 갱신 - UI를 즉시 업데이트
+        let previousGender = currentUser?.gender
+        currentUser?.gender = gender
+        
+        // 백그라운드에서 비동기 처리
+        Task {
+            await updateGenderAsync(uid: uid, gender: gender, previousGender: previousGender)
+        }
+    }
+    
+    @MainActor
+    private func updateGenderAsync(uid: String, gender: Gender, previousGender: Gender?) async {
+        do {
+            try await db.collection("users").document(uid).updateData([
+                "gender": gender.rawValue
+            ])
+            #if DEBUG
+            print("✅ 성별 업데이트 완료: \(gender.displayName)")
+            #endif
+        } catch {
+            // 실패 시 로컬 상태 롤백
+            currentUser?.gender = previousGender
+            #if DEBUG
+            print("❌ 성별 업데이트 실패: \(error.localizedDescription)")
+            #endif
         }
     }
     
     func updatePreferredGender(_ gender: Gender?) {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         
-        let genderValue = gender?.rawValue ?? ""
+        // 먼저 로컬 상태 갱신 - UI를 즉시 업데이트
+        let previousGender = currentUser?.preferredGender
+        currentUser?.preferredGender = gender
         
-        db.collection("users").document(uid).updateData([
-            "preferredGender": genderValue
-        ]) { [weak self] error in
-            if error == nil {
-                self?.currentUser?.preferredGender = gender
-                if let gender = gender {
-                    print("✅ 선호 성별 업데이트 완료: \(gender.displayName)")
-                } else {
-                    print("✅ 선호 성별 선택 해제 완료")
-                }
+        // 백그라운드에서 비동기 처리
+        Task {
+            await updatePreferredGenderAsync(uid: uid, gender: gender, previousGender: previousGender)
+        }
+    }
+    
+    @MainActor
+    private func updatePreferredGenderAsync(uid: String, gender: Gender?, previousGender: Gender?) async {
+        do {
+            let genderValue = gender?.rawValue ?? ""
+            try await db.collection("users").document(uid).updateData([
+                "preferredGender": genderValue
+            ])
+            #if DEBUG
+            if let gender = gender {
+                print("✅ 선호 성별 업데이트 완료: \(gender.displayName)")
             } else {
-                print("❌ 선호 성별 업데이트 실패: \(error?.localizedDescription ?? "")")
+                print("✅ 선호 성별 선택 해제 완료")
             }
+            #endif
+        } catch {
+            // 실패 시 로컬 상태 롤백
+            currentUser?.preferredGender = previousGender
+            #if DEBUG
+            print("❌ 선호 성별 업데이트 실패: \(error.localizedDescription)")
+            #endif
         }
     }
     

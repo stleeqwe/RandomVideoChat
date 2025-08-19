@@ -14,7 +14,10 @@ struct MainView: View {
     @State private var showPermissionAlert = false
     @State private var permissionMessage = ""
     @State private var showSettings = false
-    @State private var showAppleSignInAlert = false
+    
+    // 로컬 성별 상태 관리
+    @State private var myGender: Gender?
+    @State private var preferredGender: Gender?
     
     var body: some View {
         ZStack {
@@ -51,14 +54,6 @@ struct MainView: View {
                 HStack {
                     Spacer()
                     
-                    // Apple Sign In 버튼 (미구현)
-                    Button(action: { showAppleSignInAlert = true }) {
-                        Image(systemName: "apple.logo")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.top, 50)
-                    .padding(.trailing, 15)
                     
                     // 설정 버튼
                     Button(action: { showSettings = true }) {
@@ -78,8 +73,9 @@ struct MainView: View {
                         GenderSelectionView(
                             title: "내 성별",
                             isRequired: true,
-                            selectedGender: userManager.currentUser?.gender,
+                            selectedGender: $myGender,
                             onGenderSelected: { gender in
+                                myGender = gender
                                 userManager.updateGender(gender)
                             }
                         )
@@ -87,12 +83,14 @@ struct MainView: View {
                         GenderSelectionView(
                             title: "선호 성별",
                             isRequired: false,
-                            selectedGender: userManager.currentUser?.preferredGender,
+                            selectedGender: $preferredGender,
                             onGenderSelected: { gender in
                                 // 선호 성별은 토글 가능 - 같은 성별 재선택 시 해제
-                                if userManager.currentUser?.preferredGender == gender {
+                                if preferredGender == gender {
+                                    preferredGender = nil
                                     userManager.updatePreferredGender(nil)
                                 } else {
+                                    preferredGender = gender
                                     userManager.updatePreferredGender(gender)
                                 }
                             }
@@ -232,11 +230,6 @@ struct MainView: View {
                       secondaryButton: .cancel(Text("닫기")))
             }
         }
-        .alert("Apple Sign In", isPresented: $showAppleSignInAlert) {
-            Button("확인") { }
-        } message: {
-            Text("Apple Sign In 기능은 현재 개발 중입니다. 곧 업데이트될 예정입니다.")
-        }
         .onAppear {
             // 저장된 카메라 상태 복원
             isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
@@ -248,6 +241,10 @@ struct MainView: View {
             
             // 권한 요청
             checkPermissions()
+            
+            // 로컬 상태를 UserManager의 현재 값으로 초기화
+            myGender = userManager.currentUser?.gender
+            preferredGender = userManager.currentUser?.preferredGender
             requestPermissions()
             
             // 현재 사용자 데이터 로드
@@ -260,6 +257,10 @@ struct MainView: View {
             if let user = user {
                 heartCount = user.heartCount
                 UserDefaults.standard.set(heartCount, forKey: "heartCount")
+                
+                // 로컬 성별 상태도 동기화
+                myGender = user.gender
+                preferredGender = user.preferredGender
             } else {
                 // Firestore에 데이터가 없으면 UserDefaults 확인
                 let saved = UserDefaults.standard.integer(forKey: "heartCount")
@@ -350,7 +351,7 @@ struct MainView: View {
 struct GenderSelectionView: View {
     let title: String
     let isRequired: Bool
-    let selectedGender: Gender?
+    @Binding var selectedGender: Gender?
     let onGenderSelected: (Gender) -> Void
     
     var body: some View {
@@ -389,7 +390,7 @@ struct GenderSelectionView: View {
                         }
                     }
                     .scaleEffect(selectedGender == gender ? 1.1 : 1.0)
-                    .animation(.easeInOut(duration: 0.2), value: selectedGender)
+                    .animation(.easeInOut(duration: 0.1), value: selectedGender)
                 }
             }
         }

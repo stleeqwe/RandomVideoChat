@@ -347,6 +347,9 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             case .starting, .decoding:
                 self.remoteVideoEnabled = true
                 print("   ➜ 원격 비디오 활성화")
+            case .failed:
+                self.remoteVideoEnabled = false
+                print("   ➜ 원격 비디오 실패 - 비활성화")
             @unknown default:
                 break
             }
@@ -360,8 +363,8 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         // 비디오 품질 적응형 설정
         setupAdaptiveVideoConfig()
         
-        // 오디오 처리 최적화
-        agoraKit.setAudioProfile(.speechStandard, scenario: .default)
+        // 오디오 처리 최적화 (최신 API 사용)
+        agoraKit.setAudioProfile(.speechStandard)
         
         // 에코 캔슬레이션 및 노이즈 억제
         agoraKit.enableAudio()
@@ -370,8 +373,8 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         // 하드웨어 가속 활성화
         agoraKit.setEnableSpeakerphone(true)
         
-        // 네트워크 적응 활성화
-        agoraKit.enableDualStreamMode(true)
+        // 네트워크 적응 활성화 (최신 API 사용)
+        agoraKit.setDualStreamMode(.enableSimulcastStream)
         
         print("🚀 Agora 성능 최적화 설정 완료")
     }
@@ -402,7 +405,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             videoConfig.bitrate = 200
             print("📶 네트워크 품질: 나쁨 - 저품질 비디오 설정")
             
-        default:
+        case .unknown:
             videoConfig.dimensions = AgoraVideoDimension640x480
             videoConfig.frameRate = .fps24
             videoConfig.bitrate = AgoraVideoBitrateStandard
@@ -422,7 +425,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     
     // 성능 메트릭 수집
     func collectPerformanceMetrics() {
-        guard let agoraKit = agoraKit else { return }
+        guard agoraKit != nil else { return }
         
         // 연결 상태 정보 수집
         print("📊 Agora Performance Metrics:")
