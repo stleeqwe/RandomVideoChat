@@ -3,6 +3,8 @@ import Firebase
 import FirebaseAuth
 import FirebaseFirestore
 import FirebaseDatabase
+import AuthenticationServices
+import CryptoKit
 
 class UserManager: ObservableObject {
     static let shared = UserManager()
@@ -19,6 +21,23 @@ class UserManager: ObservableObject {
     func loadCurrentUserIfNeeded() {
         if let uid = Auth.auth().currentUser?.uid {
             loadCurrentUser(uid: uid)
+        }
+    }
+    
+    // 자동 로그인 상태 확인
+    func checkAutoLoginStatus() -> Bool {
+        return Auth.auth().currentUser != nil
+    }
+    
+    // 로그아웃
+    func signOut() {
+        do {
+            try Auth.auth().signOut()
+            currentUser = nil
+            clearRecentMatches()
+            print("✅ 로그아웃 완료")
+        } catch {
+            print("❌ 로그아웃 실패: \(error.localizedDescription)")
         }
     }
     
@@ -346,5 +365,194 @@ class UserManager: ObservableObject {
         }
     }
     
+    // MARK: - Account Deletion with Re-authentication
     
+    func deleteAccount(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let currentUser = Auth.auth().currentUser else {
+            completion(.failure(NSError(domain: "UserManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No authenticated user found"])))
+            return
+        }
+        
+        // Try to delete the account first
+        currentUser.delete { [weak self] error in
+            if let error = error as NSError? {
+                // Check if re-authentication is required
+                if error.code == AuthErrorCode.requiresRecentLogin.rawValue {
+                    // Re-authenticate with Apple Sign In
+                    if #available(iOS 13.0, *) {
+                        self?.reauthenticateWithApple { reauthResult in
+                            switch reauthResult {
+                            case .success:
+                                // Try deletion again after re-authentication
+                                currentUser.delete { deleteError in
+                                    if let deleteError = deleteError {
+                                        completion(.failure(deleteError))
+                                    } else {
+                                        self?.cleanupUserData(uid: currentUser.uid, completion: completion)
+                                    }
+                                }
+                            case .failure(let reauthError):
+                                completion(.failure(reauthError))
+                            }
+                        }
+                    } else {
+                        completion(.failure(NSError(domain: "UserManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Re-authentication requires iOS 13.0 or later"])))
+                    }
+                } else {
+                    completion(.failure(error))
+                }
+            } else {
+                // Account deleted successfully, cleanup user data
+                self?.cleanupUserData(uid: currentUser.uid, completion: completion)
+            }
+        }
+    }
+    
+    @available(iOS 13.0, *)
+    private func reauthenticateWithApple(completion: @escaping (Result<Void, Error>) -> Void) {
+        let nonce = randomNonceString()
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.nonce = sha256(nonce)
+        request.requestedScopes = []
+        
+        let coordinator = AppleReauthCoordinator(
+            currentNonce: nonce,
+            completion: completion
+        )
+        
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = coordinator
+        controller.presentationContextProvider = coordinator
+        
+        // Keep reference to prevent deallocation
+        objc_setAssociatedObject(self, &AssociatedKeys.reauthCoordinator, coordinator, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        
+        controller.performRequests()
+    }
+    
+    private func cleanupUserData(uid: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        let batch = db.batch()
+        
+        // Delete user document
+        let userRef = db.collection("users").document(uid)
+        batch.deleteDocument(userRef)
+        
+        // Delete any presence data
+        let presenceRef = Database.database().reference().child("presence").child(uid)
+        presenceRef.removeValue()
+        
+        // Delete notifications
+        let notificationsRef = Database.database().reference().child("notifications").child(uid)
+        notificationsRef.removeValue()
+        
+        // Execute batch delete
+        batch.commit { [weak self] error in
+            if let error = error {
+                completion(.failure(error))
+            } else {
+                // Clear local user data
+                self?.currentUser = nil
+                self?.clearRecentMatches()
+                completion(.success(()))
+                print("✅ Account and all associated data deleted successfully")
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods for Apple Re-auth
+    
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        let charset: Array<Character> =
+        Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remainingLength = length
+        
+        while remainingLength > 0 {
+            let randoms: [UInt8] = (0 ..< 16).map { _ in
+                var random: UInt8 = 0
+                let errorCode = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
+                if errorCode != errSecSuccess {
+                    fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+                }
+                return random
+            }
+            
+            randoms.forEach { random in
+                if remainingLength == 0 {
+                    return
+                }
+                
+                if random < charset.count {
+                    result.append(charset[Int(random)])
+                    remainingLength -= 1
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashedData = SHA256.hash(data: inputData)
+        let hashString = hashedData.compactMap {
+            String(format: "%02x", $0)
+        }.joined()
+        
+        return hashString
+    }
+}
+
+// MARK: - Apple Re-authentication Coordinator
+
+private struct AssociatedKeys {
+    static var reauthCoordinator = "reauthCoordinator"
+}
+
+@available(iOS 13.0, *)
+class AppleReauthCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private let currentNonce: String
+    private let completion: (Result<Void, Error>) -> Void
+    
+    init(currentNonce: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        self.currentNonce = currentNonce
+        self.completion = completion
+        super.init()
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let identityToken = appleIDCredential.identityToken,
+              let idTokenString = String(data: identityToken, encoding: .utf8) else {
+            completion(.failure(NSError(domain: "AppleReauth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get Apple ID token"])))
+            return
+        }
+        
+        let credential = OAuthProvider.credential(
+            withProviderID: "apple.com",
+            idToken: idTokenString,
+            rawNonce: currentNonce
+        )
+        
+        Auth.auth().currentUser?.reauthenticate(with: credential) { _, error in
+            if let error = error {
+                self.completion(.failure(error))
+            } else {
+                self.completion(.success(()))
+            }
+        }
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        completion(.failure(error))
+    }
+    
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else {
+            return UIWindow()
+        }
+        return window
+    }
 }

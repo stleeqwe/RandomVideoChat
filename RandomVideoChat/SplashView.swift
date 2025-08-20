@@ -92,7 +92,7 @@ struct SplashView: View {
                 particleOpacity = 1.0
             }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeInOut(duration: 0.6)) {
                     logoOpacity = 0
                     logoScale = 1.1

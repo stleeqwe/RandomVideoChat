@@ -7,6 +7,9 @@ struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var showDeleteAccountAlert = false
     @State private var isDeleting = false
+    @State private var showDeleteResult = false
+    @State private var deleteSuccess = false
+    @State private var deleteMessage = ""
     @StateObject private var userManager = UserManager.shared
     
     var body: some View {
@@ -53,6 +56,19 @@ struct SettingsView: View {
                 }
                 
                 Section {
+                    // 로그아웃 버튼
+                    Button(action: {
+                        userManager.signOut()
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.backward.circle")
+                                .foregroundColor(.blue)
+                            Text("로그아웃")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
                     Button(action: { showDeleteAccountAlert = true }) {
                         HStack {
                             Image(systemName: "person.crop.circle.badge.minus")
@@ -82,45 +98,60 @@ struct SettingsView: View {
                 userManager.loadCurrentUser(uid: uid)
             }
         }
-        .alert("계정 삭제", isPresented: $showDeleteAccountAlert) {
-            Button("취소", role: .cancel) { }
-            Button("삭제", role: .destructive) {
+        .alert("Delete Account", isPresented: $showDeleteAccountAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
                 deleteAccount()
             }
         } message: {
-            Text("계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다. 모든 데이터가 영구적으로 삭제됩니다.")
+            Text("Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently deleted.")
+        }
+        .alert("Account Deletion", isPresented: $showDeleteResult) {
+            Button("OK") {
+                if deleteSuccess {
+                    presentationMode.wrappedValue.dismiss()
+                }
+            }
+        } message: {
+            Text(deleteMessage)
         }
     }
     
     private func deleteAccount() {
-        guard let user = Auth.auth().currentUser else { return }
-        
         isDeleting = true
-        let uid = user.uid
         
-        // 1. Firestore 사용자 데이터 삭제
-        let db = Firestore.firestore()
-        db.collection("users").document(uid).delete { error in
-            if let error = error {
-                print("❌ Firestore 데이터 삭제 실패: \(error)")
-                isDeleting = false
-                return
-            }
-            
-            // 2. Firebase Auth 계정 삭제
-            user.delete { error in
-                isDeleting = false
+        userManager.deleteAccount { [self] result in
+            DispatchQueue.main.async {
+                self.isDeleting = false
                 
-                if let error = error {
-                    print("❌ 계정 삭제 실패: \(error)")
-                } else {
-                    print("✅ 계정 삭제 완료")
-                    // 메인 화면으로 이동 (로그인 화면으로 자동 이동됨)
-                    presentationMode.wrappedValue.dismiss()
+                switch result {
+                case .success:
+                    self.deleteSuccess = true
+                    self.deleteMessage = "Your account has been successfully deleted."
+                    self.showDeleteResult = true
+                case .failure(let error):
+                    self.deleteSuccess = false
+                    
+                    // Provide user-friendly error messages
+                    if let nsError = error as NSError? {
+                        switch nsError.code {
+                        case AuthErrorCode.requiresRecentLogin.rawValue:
+                            self.deleteMessage = "For security reasons, please sign in again to delete your account."
+                        case AuthErrorCode.networkError.rawValue:
+                            self.deleteMessage = "Network error. Please check your connection and try again."
+                        default:
+                            self.deleteMessage = "Account deletion failed: \(error.localizedDescription)"
+                        }
+                    } else {
+                        self.deleteMessage = "Account deletion failed. Please try again."
+                    }
+                    
+                    self.showDeleteResult = true
                 }
             }
         }
     }
+}
 }
 
 #Preview {

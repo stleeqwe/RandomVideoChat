@@ -14,5 +14,16 @@
 	<string>5sec은 음성 통화를 위해 마이크 접근 권한이 필요합니다.</string>
 	<key>AGORA_APP_ID</key>
 	<string>b08a13aaebf94a80af0ddd173ce08fbb</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.pukaworks.5sec</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.pukaworks.5sec</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
