@@ -33,19 +33,18 @@ struct AppleSignInView: View {
             
             VStack(spacing: 40) {
                 // 앱 브랜딩
-                VStack(spacing: 25) {
-                    Text("5SEC")
-                        .font(.system(size: 54, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.white, Color(.sRGB, red: 0.9, green: 0.9, blue: 1.0)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
+                VStack(spacing: 30) {
+                    VStack(spacing: -50) {
+                        Text("5")
+                            .font(.custom("Carter One", size: 120))
+                            .foregroundColor(.white)
+                        Text("SEC")
+                            .font(.custom("Carter One", size: 32))
+                            .foregroundColor(.white)
+                    }
                     
-                    Text("안전하고 빠른 로그인")
-                        .font(.system(size: 18, weight: .medium))
+                    Text("Welcome!")
+                        .font(.custom("Carter One", size: 24))
                         .foregroundColor(.white.opacity(0.8))
                 }
                 .padding(.top, 100)
@@ -68,16 +67,6 @@ struct AppleSignInView: View {
                         .cornerRadius(28)
                         .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                         
-                        // 연령 제한 안내
-                        VStack(spacing: 8) {
-                            Text("18세 이상만 이용 가능")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
-                            
-                            Text("Apple Sign In을 통해 안전하게 인증합니다")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
                     }
                     .padding(.horizontal, 40)
                 } else {
@@ -98,28 +87,33 @@ struct AppleSignInView: View {
                     .scaleEffect(2)
             }
         }
-        .alert("연령 제한", isPresented: $showAgeError) {
-            Button("확인") {
+        .alert("Age Restriction", isPresented: $showAgeError) {
+            Button("OK") {
                 showAgeVerification = false
                 currentCredential = nil
             }
         } message: {
-            Text("18세 이상만 5SEC을 이용할 수 있습니다.")
+            Text("You must be 18 or older to use 5SEC.")
         }
     }
     
     private var ageVerificationView: some View {
         VStack(spacing: 30) {
-            VStack(spacing: 12) {
-                Text("생년월일 확인")
-                    .font(.system(size: 24, weight: .bold))
+            // 앱 브랜딩
+            VStack(spacing: -50) {
+                Text("5")
+                    .font(.custom("Carter One", size: 120))
                     .foregroundColor(.white)
-                
-                Text("18세 이상 확인을 위해\n생년월일을 입력해주세요")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
+                Text("SEC")
+                    .font(.custom("Carter One", size: 32))
+                    .foregroundColor(.white)
             }
+            .padding(.top, 40)
+            
+            Text("생년월일 확인")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.top, 60)
             
             // 생년월일 선택기
             DatePicker(
@@ -140,7 +134,7 @@ struct AppleSignInView: View {
             // 버튼들
             VStack(spacing: 16) {
                 Button(action: verifyAge) {
-                    Text("확인")
+                    Text("Confirm")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -162,7 +156,7 @@ struct AppleSignInView: View {
                     showAgeVerification = false
                     currentCredential = nil
                 }) {
-                    Text("취소")
+                    Text("Cancel")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }

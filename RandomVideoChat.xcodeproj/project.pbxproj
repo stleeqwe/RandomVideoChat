@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		883B1C7F2E4AA68200143841 /* GoogleSansCode-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */; };
+		883B1C812E55334A00143841 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 883B1C802E55334A00143841 /* GoogleService-Info.plist */; };
 		8871CC4B2E40DAB90096BD2F /* RandomVideoChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC4A2E40DAB90096BD2F /* RandomVideoChatApp.swift */; };
 		8871CC4D2E40DAB90096BD2F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC4C2E40DAB90096BD2F /* ContentView.swift */; };
 		8871CC4F2E40DABB0096BD2F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8871CC4E2E40DABB0096BD2F /* Assets.xcassets */; };
@@ -15,13 +16,13 @@
 		8871CC5C2E40DABB0096BD2F /* RandomVideoChatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC5B2E40DABB0096BD2F /* RandomVideoChatTests.swift */; };
 		8871CC662E40DABB0096BD2F /* RandomVideoChatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC652E40DABB0096BD2F /* RandomVideoChatUITests.swift */; };
 		8871CC682E40DABB0096BD2F /* RandomVideoChatUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC672E40DABB0096BD2F /* RandomVideoChatUITestsLaunchTests.swift */; };
-		8871CC752E40DEF60096BD2F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8871CC742E40DEF60096BD2F /* GoogleService-Info.plist */; };
 		8871CC782E40E3DE0096BD2F /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC772E40E3DE0096BD2F /* SplashView.swift */; };
 		8871CC7A2E40E4D60096BD2F /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC792E40E4D60096BD2F /* MainView.swift */; };
 		8871CC7C2E40E5560096BD2F /* MatchingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC7B2E40E5560096BD2F /* MatchingView.swift */; };
 		8871CC7E2E40E5F10096BD2F /* VideoCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC7D2E40E5F10096BD2F /* VideoCallView.swift */; };
 		8871CC812E40E78A0096BD2F /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871CC802E40E78A0096BD2F /* CameraView.swift */; };
 		8889DB3F2E48C1CE0040E898 /* CarterOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */; };
+		88APP0012E90000001234567 /* AppleSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88APP0002E90000001234567 /* AppleSignInView.swift */; };
 		88C07E252E4177A8004A3F93 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C07E242E4177A8004A3F93 /* User.swift */; };
 		88C07E272E4177C0004A3F93 /* UserManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C07E262E4177C0004A3F93 /* UserManager.swift */; };
 		88C07E292E4178D1004A3F93 /* MatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C07E282E4178D1004A3F93 /* MatchingManager.swift */; };
@@ -41,8 +42,8 @@
 		88MOD0012E60000001234567 /* ContentModerationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MOD0002E60000001234567 /* ContentModerationManager.swift */; };
 		88PER0012E70000001234567 /* PerformanceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88PER0002E70000001234567 /* PerformanceMonitor.swift */; };
 		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
+		88SGN0012EA0000001234567 /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SGN0002EA0000001234567 /* SignUpView.swift */; };
 		88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SWP0002E80000001234567 /* SwipeHintView.swift */; };
-		88APP0012E90000001234567 /* AppleSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88APP0002E90000001234567 /* AppleSignInView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +65,7 @@
 
 /* Begin PBXFileReference section */
 		883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GoogleSansCode-VariableFont_wght.ttf"; sourceTree = "<group>"; };
+		883B1C802E55334A00143841 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "../../../Downloads/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		8871CC472E40DAB90096BD2F /* RandomVideoChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RandomVideoChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8871CC4A2E40DAB90096BD2F /* RandomVideoChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RandomVideoChatApp.swift; sourceTree = "<group>"; };
 		8871CC4C2E40DAB90096BD2F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -74,7 +76,6 @@
 		8871CC612E40DABB0096BD2F /* RandomVideoChatUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RandomVideoChatUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8871CC652E40DABB0096BD2F /* RandomVideoChatUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RandomVideoChatUITests.swift; sourceTree = "<group>"; };
 		8871CC672E40DABB0096BD2F /* RandomVideoChatUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RandomVideoChatUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		8871CC742E40DEF60096BD2F /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		8871CC772E40E3DE0096BD2F /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		8871CC792E40E4D60096BD2F /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		8871CC7B2E40E5560096BD2F /* MatchingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchingView.swift; sourceTree = "<group>"; };
@@ -82,19 +83,21 @@
 		8871CC7F2E40E7380096BD2F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8871CC802E40E78A0096BD2F /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "CarterOne-Regular.ttf"; path = "../../../Downloads/Carter_One/CarterOne-Regular.ttf"; sourceTree = "<group>"; };
+		88APP0002E90000001234567 /* AppleSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInView.swift; sourceTree = "<group>"; };
 		88C07E242E4177A8004A3F93 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		88C07E262E4177C0004A3F93 /* UserManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserManager.swift; sourceTree = "<group>"; };
 		88C07E282E4178D1004A3F93 /* MatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchingManager.swift; sourceTree = "<group>"; };
 		88C07E332E4220B1004A3F93 /* AgoraVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraVideoView.swift; sourceTree = "<group>"; };
 		88C07E352E422205004A3F93 /* AgoraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraManager.swift; sourceTree = "<group>"; };
 		88DFC5CB2E416F6F00A601E4 /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
+		88ENT0012E90000001234567 /* RandomVideoChat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RandomVideoChat.entitlements; sourceTree = "<group>"; };
 		88IMG0002E70000001234567 /* ImageCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheManager.swift; sourceTree = "<group>"; };
 		88MEM0002E70000001234567 /* MemoryLeakDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLeakDetector.swift; sourceTree = "<group>"; };
 		88MOD0002E60000001234567 /* ContentModerationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModerationManager.swift; sourceTree = "<group>"; };
 		88PER0002E70000001234567 /* PerformanceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMonitor.swift; sourceTree = "<group>"; };
 		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		88SGN0002EA0000001234567 /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		88SWP0002E80000001234567 /* SwipeHintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeHintView.swift; sourceTree = "<group>"; };
-		88APP0002E90000001234567 /* AppleSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -153,10 +156,11 @@
 		8871CC492E40DAB90096BD2F /* RandomVideoChat */ = {
 			isa = PBXGroup;
 			children = (
+				883B1C802E55334A00143841 /* GoogleService-Info.plist */,
 				8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */,
 				883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */,
 				8871CC7F2E40E7380096BD2F /* Info.plist */,
-				8871CC742E40DEF60096BD2F /* GoogleService-Info.plist */,
+				88ENT0012E90000001234567 /* RandomVideoChat.entitlements */,
 				8871CC4A2E40DAB90096BD2F /* RandomVideoChatApp.swift */,
 				8871CC4C2E40DAB90096BD2F /* ContentView.swift */,
 				8871CC4E2E40DABB0096BD2F /* Assets.xcassets */,
@@ -179,6 +183,7 @@
 				88C07E352E422205004A3F93 /* AgoraManager.swift */,
 				88SWP0002E80000001234567 /* SwipeHintView.swift */,
 				88APP0002E90000001234567 /* AppleSignInView.swift */,
+				88SGN0002EA0000001234567 /* SignUpView.swift */,
 			);
 			path = RandomVideoChat;
 			sourceTree = "<group>";
@@ -328,7 +333,7 @@
 			files = (
 				8871CC522E40DABB0096BD2F /* Preview Assets.xcassets in Resources */,
 				8871CC4F2E40DABB0096BD2F /* Assets.xcassets in Resources */,
-				8871CC752E40DEF60096BD2F /* GoogleService-Info.plist in Resources */,
+				883B1C812E55334A00143841 /* GoogleService-Info.plist in Resources */,
 				8889DB3F2E48C1CE0040E898 /* CarterOne-Regular.ttf in Resources */,
 				883B1C7F2E4AA68200143841 /* GoogleSansCode-VariableFont_wght.ttf in Resources */,
 			);
@@ -375,6 +380,7 @@
 				8871CC782E40E3DE0096BD2F /* SplashView.swift in Sources */,
 				88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */,
 				88APP0012E90000001234567 /* AppleSignInView.swift in Sources */,
+				88SGN0012EA0000001234567 /* SignUpView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -535,6 +541,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = RandomVideoChat/RandomVideoChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";
@@ -568,6 +575,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = RandomVideoChat/RandomVideoChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"RandomVideoChat/Preview Content\"";
