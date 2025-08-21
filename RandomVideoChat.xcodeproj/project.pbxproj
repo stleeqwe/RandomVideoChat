@@ -42,7 +42,6 @@
 		88MOD0012E60000001234567 /* ContentModerationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MOD0002E60000001234567 /* ContentModerationManager.swift */; };
 		88PER0012E70000001234567 /* PerformanceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88PER0002E70000001234567 /* PerformanceMonitor.swift */; };
 		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
-		88ONB0012EB0000001234567 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ONB0002EB0000001234567 /* OnboardingView.swift */; };
 		88SGN0012EA0000001234567 /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SGN0002EA0000001234567 /* SignUpView.swift */; };
 		88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SWP0002E80000001234567 /* SwipeHintView.swift */; };
 /* End PBXBuildFile section */
@@ -96,7 +95,6 @@
 		88MEM0002E70000001234567 /* MemoryLeakDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLeakDetector.swift; sourceTree = "<group>"; };
 		88MOD0002E60000001234567 /* ContentModerationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModerationManager.swift; sourceTree = "<group>"; };
 		88PER0002E70000001234567 /* PerformanceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMonitor.swift; sourceTree = "<group>"; };
-		88ONB0002EB0000001234567 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		88SGN0002EA0000001234567 /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		88SWP0002E80000001234567 /* SwipeHintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeHintView.swift; sourceTree = "<group>"; };
@@ -184,7 +182,6 @@
 				88C07E332E4220B1004A3F93 /* AgoraVideoView.swift */,
 				88C07E352E422205004A3F93 /* AgoraManager.swift */,
 				88SWP0002E80000001234567 /* SwipeHintView.swift */,
-				88ONB0002EB0000001234567 /* OnboardingView.swift */,
 				88APP0002E90000001234567 /* AppleSignInView.swift */,
 				88SGN0002EA0000001234567 /* SignUpView.swift */,
 			);
@@ -382,7 +379,6 @@
 				88C07E272E4177C0004A3F93 /* UserManager.swift in Sources */,
 				8871CC782E40E3DE0096BD2F /* SplashView.swift in Sources */,
 				88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */,
-				88ONB0012EB0000001234567 /* OnboardingView.swift in Sources */,
 				88APP0012E90000001234567 /* AppleSignInView.swift in Sources */,
 				88SGN0012EA0000001234567 /* SignUpView.swift in Sources */,
 			);

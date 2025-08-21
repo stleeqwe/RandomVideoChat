@@ -28,7 +28,7 @@ struct ContentView: View {
             } else if !isAuthenticated {
                 // Onboarding screen for new users
                 if #available(iOS 15.0, *) {
-                    OnboardingView(isAuthenticated: $isAuthenticated)
+                    SignUpView(isAuthenticated: $isAuthenticated)
                 } else {
                     Text("iOS 15.0+ required").foregroundColor(.white)
                 }

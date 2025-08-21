@@ -5,12 +5,8 @@ struct AppleSignInView: View {
     @Binding var isAuthenticated: Bool
     
     var body: some View {
-        // Legacy wrapper - redirect to unified OnboardingView
-        if #available(iOS 15.0, *) {
-            OnboardingView(isAuthenticated: $isAuthenticated)
-        } else {
-            Text("iOS 15.0+ required for onboarding").foregroundColor(.white)
-        }
+        // Legacy wrapper - redirect to SignUpView which contains the unified onboarding
+        SignUpView(isAuthenticated: $isAuthenticated)
     }
 }
 
