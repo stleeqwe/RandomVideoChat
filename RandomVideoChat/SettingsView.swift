@@ -98,16 +98,16 @@ struct SettingsView: View {
                 userManager.loadCurrentUser(uid: uid)
             }
         }
-        .alert("Delete Account", isPresented: $showDeleteAccountAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
+        .alert("계정 삭제", isPresented: $showDeleteAccountAlert) {
+            Button("취소", role: .cancel) { }
+            Button("삭제", role: .destructive) {
                 deleteAccount()
             }
         } message: {
-            Text("Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently deleted.")
+            Text("정말로 계정을 삭제하시겠습니까? 이 작업은 취소할 수 없으며, 모든 데이터가 영구적으로 삭제됩니다.")
         }
-        .alert("Account Deletion", isPresented: $showDeleteResult) {
-            Button("OK") {
+        .alert("계정 삭제", isPresented: $showDeleteResult) {
+            Button("확인") {
                 if deleteSuccess {
                     presentationMode.wrappedValue.dismiss()
                 }
@@ -127,23 +127,23 @@ struct SettingsView: View {
                 switch result {
                 case .success:
                     self.deleteSuccess = true
-                    self.deleteMessage = "Your account has been successfully deleted."
+                    self.deleteMessage = "계정이 성공적으로 삭제되었습니다."
                     self.showDeleteResult = true
                 case .failure(let error):
                     self.deleteSuccess = false
                     
-                    // Provide user-friendly error messages
+                    // Provide user-friendly error messages in Korean
                     if let nsError = error as NSError? {
                         switch nsError.code {
                         case AuthErrorCode.requiresRecentLogin.rawValue:
-                            self.deleteMessage = "For security reasons, please sign in again to delete your account."
+                            self.deleteMessage = "보안상의 이유로 다시 로그인하신 후 계정을 삭제해 주세요."
                         case AuthErrorCode.networkError.rawValue:
-                            self.deleteMessage = "Network error. Please check your connection and try again."
+                            self.deleteMessage = "네트워크 오류가 발생했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요."
                         default:
-                            self.deleteMessage = "Account deletion failed: \(error.localizedDescription)"
+                            self.deleteMessage = "계정 삭제 실패: \(error.localizedDescription)"
                         }
                     } else {
-                        self.deleteMessage = "Account deletion failed. Please try again."
+                        self.deleteMessage = "계정 삭제에 실패했습니다. 다시 시도해 주세요."
                     }
                     
                     self.showDeleteResult = true

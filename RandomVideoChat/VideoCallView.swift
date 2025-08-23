@@ -25,6 +25,9 @@ struct VideoCallView: View {
     @State private var showBlockAlert = false
     @State private var reportReason = ""
     
+    // Firestore 리스너
+    @State private var heartCountListener: ListenerRegistration?
+    
     // 앱 상태 및 백그라운드 감지를 위한 프로퍼티
     @Environment(\.scenePhase) private var scenePhase
     @State private var isBackground = false
@@ -343,9 +346,13 @@ struct VideoCallView: View {
             // 내가 종료하는 경우에만 통화 종료 신호 전송 (matchId 삭제 전에 실행)
             if let matchId = UserDefaults.standard.string(forKey: "currentMatchId") {
                 MatchingManager.shared.signalCallEnd(matchId: matchId)
+                #if DEBUG
                 print("📡 통화 종료 신호 전송 시도: matchId = \(matchId)")
+                #endif
             } else {
+                #if DEBUG
                 print("❌ 통화 종료 신호 전송 실패: matchId가 없음")
+                #endif
                 // matchId가 없어도 일단 기본 함수 시도
                 MatchingManager.shared.signalCallEnd()
             }
@@ -368,6 +375,10 @@ struct VideoCallView: View {
         // Firebase 리스너 정리
         MatchingManager.shared.cleanupCallObservers()
         cleanupCallSyncObservers()
+        
+        // Firestore heartCount 리스너 해제
+        heartCountListener?.remove()
+        heartCountListener = nil
         
         // UserDefaults 정리
         UserDefaults.standard.removeObject(forKey: "currentChannelName")
@@ -428,7 +439,7 @@ struct VideoCallView: View {
     // MARK: - 하트 실시간 관찰
     func observeHeartCount(uid: String) {
         let db = Firestore.firestore()
-        db.collection("users").document(uid)
+        heartCountListener = db.collection("users").document(uid)
             .addSnapshotListener { documentSnapshot, error in
                 guard let document = documentSnapshot else { return }
                 if let data = document.data(),
@@ -599,18 +610,24 @@ struct VideoCallView: View {
     // MARK: - Enhanced Report and Block Functions
     private func reportUser(reason: String) {
         guard !opponentUserId.isEmpty else {
+            #if DEBUG
             print("❌ 신고 실패: 상대방 ID가 없음")
+            #endif
             return
         }
         
         ContentModerationManager.shared.reportUser(reportedUserId: opponentUserId, reason: reason) { success in
             DispatchQueue.main.async {
                 if success {
+                    #if DEBUG
                     print("✅ 신고 완료: \(reason)")
+                    #endif
                     // 신고 완료 후 통화 종료
                     self.endVideoCall()
                 } else {
+                    #if DEBUG
                     print("❌ 신고 실패")
+                    #endif
                 }
             }
         }
@@ -618,13 +635,17 @@ struct VideoCallView: View {
     
     private func blockUser() {
         guard !opponentUserId.isEmpty else {
+            #if DEBUG
             print("❌ 차단 실패: 상대방 ID가 없음")
+            #endif
             return
         }
         
         // 강화된 신고 및 차단 (자동 신고 포함)
         UserManager.shared.reportAndBlockUser(opponentUserId, reason: "사용자 차단")
+        #if DEBUG
         print("✅ 사용자 신고 및 차단: \(opponentUserId)")
+        #endif
         
         // 차단 후 즉시 통화 종료
         endVideoCall()

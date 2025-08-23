@@ -35,9 +35,13 @@ class UserManager: ObservableObject {
             try Auth.auth().signOut()
             currentUser = nil
             clearRecentMatches()
+            #if DEBUG
             print("✅ 로그아웃 완료")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ 로그아웃 실패: \(error.localizedDescription)")
+            #endif
         }
     }
     
@@ -105,9 +109,13 @@ class UserManager: ObservableObject {
             "heartCount": newCount
         ]) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ 하트 업데이트 실패: \(error)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ 하트 업데이트 성공: \(newCount)개")
+                #endif
                 self.currentUser?.heartCount = newCount
             }
         }
@@ -126,9 +134,13 @@ class UserManager: ObservableObject {
             "from": Auth.auth().currentUser?.uid ?? "unknown"
         ]) { error, _ in
             if let error = error {
+                #if DEBUG
                 print("❌ 하트 알림 전송 실패: \(error)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ 하트 알림 전송 성공 (상대방: \(opponentId))")
+                #endif
             }
         }
     }
@@ -145,12 +157,16 @@ class UserManager: ObservableObject {
                 guard let document = documentSnapshot,
                       let data = document.data(),
                       let heartCount = data["heartCount"] as? Int else {
+                    #if DEBUG
                     print("❌ 하트 관찰 에러: \(error?.localizedDescription ?? "")")
+                    #endif
                     return
                 }
                 
                 completion(heartCount)
+                #if DEBUG
                 print("👀 하트 개수 실시간 업데이트: \(heartCount)")
+                #endif
             }
     }
     
@@ -169,9 +185,13 @@ class UserManager: ObservableObject {
         ]) { error in
             if error == nil {
                 self.currentUser?.blockedUsers.append(userId)
+                #if DEBUG
                 print("✅ 사용자 차단 완료: \(userId)")
+                #endif
             } else {
+                #if DEBUG
                 print("❌ 사용자 차단 실패: \(error?.localizedDescription ?? "")")
+                #endif
             }
         }
     }
@@ -184,9 +204,13 @@ class UserManager: ObservableObject {
         ]) { error in
             if error == nil {
                 self.currentUser?.blockedUsers.removeAll { $0 == userId }
+                #if DEBUG
                 print("✅ 사용자 차단 해제: \(userId)")
+                #endif
             } else {
+                #if DEBUG
                 print("❌ 차단 해제 실패: \(error?.localizedDescription ?? "")")
+                #endif
             }
         }
     }
@@ -199,23 +223,31 @@ class UserManager: ObservableObject {
     func canMatchWith(_ userId: String) -> Bool {
         // 1. 자기 자신과는 매칭 불가
         if userId == Auth.auth().currentUser?.uid {
+            #if DEBUG
             print("❌ 자기 자신과는 매칭 불가")
+            #endif
             return false
         }
         
         // 2. 차단된 사용자와는 매칭 불가
         if isUserBlocked(userId) {
+            #if DEBUG
             print("❌ 차단된 사용자와는 매칭 불가: \(userId)")
+            #endif
             return false
         }
         
         // 3. 최근 매칭한 사용자와는 매칭 불가 (세션 기반)
         if hasRecentlyMatched(userId) {
+            #if DEBUG
             print("❌ 최근 매칭한 사용자와는 매칭 불가: \(userId)")
+            #endif
             return false
         }
         
+        #if DEBUG
         print("✅ 매칭 가능한 사용자: \(userId)")
+        #endif
         return true
     }
     
@@ -224,8 +256,10 @@ class UserManager: ObservableObject {
     
     func addRecentMatch(_ userId: String) {
         recentMatches.insert(userId)
+        #if DEBUG
         print("📝 세션 매칭 기록 추가: \(userId)")
         print("📊 현재 세션 매칭 기록: \(recentMatches.count)명")
+        #endif
         
         // 최근 5명만 유지 (메모리 관리)
         if recentMatches.count > Self.maxRecentMatches {
@@ -240,7 +274,9 @@ class UserManager: ObservableObject {
     
     func clearRecentMatches() {
         recentMatches.removeAll()
+        #if DEBUG
         print("🧹 세션 매칭 기록 초기화")
+        #endif
     }
     
     // 세션 매칭 기록 개수 반환 (MainView 디버그용)
@@ -274,7 +310,9 @@ class UserManager: ObservableObject {
             "lastMatchAt": Timestamp(date: Date())
         ]) { error in
             if error == nil {
+                #if DEBUG
                 print("✅ 매칭 횟수 증가")
+                #endif
             }
         }
     }
@@ -285,14 +323,18 @@ class UserManager: ObservableObject {
             "heartCount": FieldValue.increment(Int64(delta))
         ]) { [weak self] error in
             if let error = error {
+                #if DEBUG
                 print("❌ 하트 수 변경 실패: \(error)")
+                #endif
             } else {
                 // Firestore 업데이트가 끝나면 로컬 모델도 갱신
                 if var user = self?.currentUser {
                     user.heartCount += delta
                     self?.currentUser = user
                 }
+                #if DEBUG
                 print("✅ 하트 수 \(delta > 0 ? "증가" : "감소"): \(delta)")
+                #endif
             }
         }
     }
@@ -373,37 +415,78 @@ class UserManager: ObservableObject {
             return
         }
         
-        // Try to delete the account first
-        currentUser.delete { [weak self] error in
-            if let error = error as NSError? {
-                // Check if re-authentication is required
-                if error.code == AuthErrorCode.requiresRecentLogin.rawValue {
-                    // Re-authenticate with Apple Sign In
-                    if #available(iOS 13.0, *) {
-                        self?.reauthenticateWithApple { reauthResult in
-                            switch reauthResult {
-                            case .success:
-                                // Try deletion again after re-authentication
-                                currentUser.delete { deleteError in
-                                    if let deleteError = deleteError {
-                                        completion(.failure(deleteError))
-                                    } else {
-                                        self?.cleanupUserData(uid: currentUser.uid, completion: completion)
+        let uid = currentUser.uid
+        
+        // 먼저 사용자 데이터를 삭제한 후 계정 삭제
+        cleanupUserData(uid: uid) { [weak self] cleanupResult in
+            switch cleanupResult {
+            case .success:
+                // 데이터 삭제 성공 후 계정 삭제 시도
+                currentUser.delete { error in
+                    if let error = error as NSError? {
+                        // Check if re-authentication is required
+                        if error.code == AuthErrorCode.requiresRecentLogin.rawValue {
+                            // Re-authenticate with Apple Sign In
+                            if #available(iOS 13.0, *) {
+                                self?.reauthenticateWithApple { reauthResult in
+                                    switch reauthResult {
+                                    case .success:
+                                        // Try deletion again after re-authentication
+                                        Auth.auth().currentUser?.delete { deleteError in
+                                            if let deleteError = deleteError {
+                                                #if DEBUG
+                                                print("❌ 재인증 후 계정 삭제 실패: \(deleteError.localizedDescription)")
+                                                #endif
+                                                completion(.failure(deleteError))
+                                            } else {
+                                                #if DEBUG
+                                                print("✅ 계정 삭제 성공")
+                                                #endif
+                                                self?.currentUser = nil
+                                                self?.clearRecentMatches()
+                                                completion(.success(()))
+                                            }
+                                        }
+                                    case .failure(let reauthError):
+                                        #if DEBUG
+                                        print("❌ 재인증 실패: \(reauthError.localizedDescription)")
+                                        #endif
+                                        completion(.failure(reauthError))
                                     }
                                 }
-                            case .failure(let reauthError):
-                                completion(.failure(reauthError))
+                            } else {
+                                completion(.failure(NSError(domain: "UserManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Re-authentication requires iOS 13.0 or later"])))
                             }
+                        } else {
+                            #if DEBUG
+                            print("❌ 계정 삭제 실패: \(error.localizedDescription)")
+                            #endif
+                            completion(.failure(error))
                         }
                     } else {
-                        completion(.failure(NSError(domain: "UserManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Re-authentication requires iOS 13.0 or later"])))
+                        // Account deleted successfully
+                        #if DEBUG
+                        print("✅ 계정 삭제 성공")
+                        #endif
+                        self?.currentUser = nil
+                        self?.clearRecentMatches()
+                        completion(.success(()))
                     }
-                } else {
-                    completion(.failure(error))
                 }
-            } else {
-                // Account deleted successfully, cleanup user data
-                self?.cleanupUserData(uid: currentUser.uid, completion: completion)
+            case .failure(let cleanupError):
+                #if DEBUG
+                print("⚠️ 데이터 삭제 실패했지만 계정 삭제 시도: \(cleanupError.localizedDescription)")
+                #endif
+                // 데이터 삭제가 실패해도 계정 삭제는 시도
+                currentUser.delete { error in
+                    if let error = error {
+                        completion(.failure(error))
+                    } else {
+                        self?.currentUser = nil
+                        self?.clearRecentMatches()
+                        completion(.success(()))
+                    }
+                }
             }
         }
     }
@@ -431,30 +514,90 @@ class UserManager: ObservableObject {
     }
     
     private func cleanupUserData(uid: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        let batch = db.batch()
+        let group = DispatchGroup()
+        var errors: [Error] = []
         
-        // Delete user document
-        let userRef = db.collection("users").document(uid)
-        batch.deleteDocument(userRef)
-        
-        // Delete any presence data
-        let presenceRef = Database.database().reference().child("presence").child(uid)
-        presenceRef.removeValue()
-        
-        // Delete notifications
-        let notificationsRef = Database.database().reference().child("notifications").child(uid)
-        notificationsRef.removeValue()
-        
-        // Execute batch delete
-        batch.commit { [weak self] error in
+        // 1. Firestore 사용자 문서 삭제
+        group.enter()
+        db.collection("users").document(uid).delete { error in
             if let error = error {
-                completion(.failure(error))
+                #if DEBUG
+                print("❌ Firestore 사용자 문서 삭제 실패: \(error.localizedDescription)")
+                #endif
+                errors.append(error)
             } else {
-                // Clear local user data
-                self?.currentUser = nil
-                self?.clearRecentMatches()
+                #if DEBUG
+                print("✅ Firestore 사용자 문서 삭제 성공")
+                #endif
+            }
+            group.leave()
+        }
+        
+        // 2. Realtime Database - presence 삭제
+        group.enter()
+        let presenceRef = Database.database().reference().child("user_presence").child(uid)
+        presenceRef.removeValue { error, _ in
+            if let error = error {
+                #if DEBUG
+                print("❌ Presence 데이터 삭제 실패: \(error.localizedDescription)")
+                #endif
+                errors.append(error)
+            } else {
+                #if DEBUG
+                print("✅ Presence 데이터 삭제 성공")
+                #endif
+            }
+            group.leave()
+        }
+        
+        // 3. Realtime Database - notifications 삭제
+        group.enter()
+        let notificationsRef = Database.database().reference().child("notifications").child(uid)
+        notificationsRef.removeValue { error, _ in
+            if let error = error {
+                #if DEBUG
+                print("❌ Notifications 데이터 삭제 실패: \(error.localizedDescription)")
+                #endif
+                errors.append(error)
+            } else {
+                #if DEBUG
+                print("✅ Notifications 데이터 삭제 성공")
+                #endif
+            }
+            group.leave()
+        }
+        
+        // 4. Realtime Database - matching_queue에서 사용자 제거
+        group.enter()
+        let matchingQueueRef = Database.database().reference().child("matching_queue")
+        matchingQueueRef.observeSingleEvent(of: .value) { snapshot in
+            if snapshot.exists() {
+                for child in snapshot.children {
+                    if let bucketSnapshot = child as? DataSnapshot {
+                        let bucketRef = matchingQueueRef.child(bucketSnapshot.key).child(uid)
+                        bucketRef.removeValue()
+                    }
+                }
+            }
+            #if DEBUG
+            print("✅ Matching queue에서 사용자 제거 완료")
+            #endif
+            group.leave()
+        }
+        
+        // 모든 작업 완료 후 콜백
+        group.notify(queue: .main) {
+            if errors.isEmpty {
+                #if DEBUG
+                print("✅ 모든 사용자 데이터 삭제 성공")
+                #endif
                 completion(.success(()))
-                print("✅ Account and all associated data deleted successfully")
+            } else {
+                #if DEBUG
+                print("⚠️ 일부 데이터 삭제 실패: \(errors.count)개 오류")
+                #endif
+                // 일부 실패해도 계정 삭제는 계속 진행
+                completion(.failure(errors.first!))
             }
         }
     }
@@ -549,10 +692,27 @@ class AppleReauthCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
     }
     
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else {
-            return UIWindow()
+        // 모든 윈도우 시도
+        if let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }),
+           let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+            return window
         }
+        
+        // 대체 방법: keyWindow 직접 찾기
+        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+            return window
+        }
+        
+        // 최후의 수단: 철 번째 윈도우
+        if let window = UIApplication.shared.windows.first {
+            return window
+        }
+        
+        // 수모든 방법 실패 시 새 윈도우 생성
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.makeKeyAndVisible()
         return window
     }
 }

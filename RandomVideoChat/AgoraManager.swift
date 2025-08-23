@@ -72,20 +72,28 @@ class AgoraManager: NSObject, ObservableObject {
         
         // 🆕 중요: 기본 오디오 라우트 설정
         agoraKit?.setDefaultAudioRouteToSpeakerphone(true)
+        #if DEBUG
         print("✅ 스피커폰 설정")
+        #endif
         
         // 비디오 활성화
         agoraKit?.enableVideo()
+        #if DEBUG
         print("✅ 비디오 활성화")
+        #endif
         
         // 오디오 활성화
         agoraKit?.enableAudio()
+        #if DEBUG
         print("✅ 오디오 활성화")
+        #endif
         
         // 🆕 중요: 로컬 오디오/비디오 명시적 활성화
         agoraKit?.enableLocalVideo(true)
         agoraKit?.enableLocalAudio(true)
+        #if DEBUG
         print("✅ 로컬 미디어 활성화")
+        #endif
         
         // 비디오 설정
         let videoConfig = AgoraVideoEncoderConfiguration(
@@ -96,7 +104,9 @@ class AgoraManager: NSObject, ObservableObject {
             mirrorMode: .auto
         )
         agoraKit?.setVideoEncoderConfiguration(videoConfig)
+        #if DEBUG
         print("✅ 비디오 설정 완료")
+        #endif
         
         // 로컬 비디오 뷰 설정
         setupLocalVideo()
@@ -119,7 +129,9 @@ class AgoraManager: NSObject, ObservableObject {
             self.localVideoView = view
         }
         
+        #if DEBUG
         print("✅ 로컬 비디오 설정 완료")
+        #endif
     }
     
     // MARK: - 통화 시작
@@ -154,8 +166,10 @@ class AgoraManager: NSObject, ObservableObject {
         
         self.channelName = channel
         
+        #if DEBUG
         print("🎯 joinChannel 호출 전")
-        print("🔑 토큰: nil (토큰 없이 연결)")  // 🆕 토큰 상태 확인
+        print("🔑 토큰: nil (토큰 없이 연결)")
+        #endif
         
         // 🆕 수정: 옵션을 더 명확하게 설정
         let options = AgoraRtcChannelMediaOptions()
@@ -177,26 +191,35 @@ class AgoraManager: NSObject, ObservableObject {
             uid: 0,  // 0은 Agora가 자동으로 UID 할당
             mediaOptions: options
         ) { [weak self] channel, uid, elapsed in
+            #if DEBUG
             print("✅ joinChannel 콜백 호출됨!")
             print("✅ 채널 참가 성공: \(channel), uid: \(uid), elapsed: \(elapsed)ms")
+            #endif
             self?.localUserId = uid
             DispatchQueue.main.async {
                 self?.isInCall = true
             }
         }
         
+        #if DEBUG
         print("🎯 joinChannel 호출 결과: \(result)")
+        #endif
         
         if result != 0 {
+            #if DEBUG
             print("❌ joinChannel 실패: \(result)")
+            #endif
             handleJoinError(result)
         } else {
+            #if DEBUG
             print("✅ joinChannel 호출 성공 (결과: 0)")
+            #endif
         }
     }
     
     // MARK: - 에러 처리
     private func handleJoinError(_ errorCode: Int32) {
+        #if DEBUG
         switch errorCode {
         case -2:
             print("❌ 잘못된 매개변수")
@@ -209,11 +232,14 @@ class AgoraManager: NSObject, ObservableObject {
         default:
             print("❌ 알 수 없는 에러: \(errorCode)")
         }
+        #endif
     }
     
     // MARK: - 통화 종료
     func endCall() {
+        #if DEBUG
         print("📱 통화 종료")
+        #endif
         agoraKit?.leaveChannel(nil)
         agoraKit?.stopPreview()
         
@@ -230,21 +256,27 @@ class AgoraManager: NSObject, ObservableObject {
     func toggleMute() -> Bool {
         isMuted.toggle()
         agoraKit?.muteLocalAudioStream(isMuted)
+        #if DEBUG
         print("🎤 음소거: \(isMuted)")
+        #endif
         return isMuted
     }
     
     // MARK: - 카메라 전환
     func switchCamera() {
         agoraKit?.switchCamera()
+        #if DEBUG
         print("📷 카메라 전환")
+        #endif
     }
     
     // MARK: - 카메라 토글
     func toggleCamera() -> Bool {
         isCameraOff.toggle()
         agoraKit?.muteLocalVideoStream(isCameraOff)
+        #if DEBUG
         print("📹 카메라: \(isCameraOff ? "OFF" : "ON")")
+        #endif
         return isCameraOff
     }
 }
@@ -254,10 +286,12 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     
     // 로컬 사용자가 채널에 성공적으로 참가
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinChannel channel: String, withUid uid: UInt, elapsed: Int) {
+        #if DEBUG
         print("🎊 didJoinChannel 델리게이트 호출!")
         print("   - 채널: \(channel)")
         print("   - UID: \(uid)")
         print("   - 소요시간: \(elapsed)ms")
+        #endif
         
         localUserId = uid
         DispatchQueue.main.async {
@@ -267,7 +301,9 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     
     // 원격 사용자가 채널에 참가
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinedOfUid uid: UInt, elapsed: Int) {
+        #if DEBUG
         print("👤 원격 사용자 참가: \(uid)")
+        #endif
         
         remoteUserId = uid
         
@@ -306,6 +342,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     
     // 연결 상태 변경
     func rtcEngine(_ engine: AgoraRtcEngineKit, connectionChangedTo state: AgoraConnectionState, reason: AgoraConnectionChangedReason) {
+        #if DEBUG
         print("🔌 연결 상태 변경: \(state.rawValue), 이유: \(reason.rawValue)")
         
         switch state {
@@ -323,33 +360,46 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         @unknown default:
             break
         }
+        #endif
     }
 
     // 에러 발생
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurError errorCode: AgoraErrorCode) {
+        #if DEBUG
         print("❌ Agora 에러: \(errorCode.rawValue)")
+        #endif
     }
     
     // 경고 발생
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurWarning warningCode: AgoraWarningCode) {
+        #if DEBUG
         print("⚠️ Agora 경고: \(warningCode.rawValue)")
+        #endif
     }
     
     // 원격 사용자의 비디오 상태 변경
     func rtcEngine(_ engine: AgoraRtcEngineKit, remoteVideoStateChangedOfUid uid: UInt, state: AgoraVideoRemoteState, reason: AgoraVideoRemoteReason, elapsed: Int) {
+        #if DEBUG
         print("📹 원격 비디오 상태 변경: UID \(uid), 상태: \(state.rawValue), 이유: \(reason.rawValue)")
+        #endif
         
         DispatchQueue.main.async {
             switch state {
             case .stopped, .frozen:
                 self.remoteVideoEnabled = false
+                #if DEBUG
                 print("   ➜ 원격 비디오 비활성화")
+                #endif
             case .starting, .decoding:
                 self.remoteVideoEnabled = true
+                #if DEBUG
                 print("   ➜ 원격 비디오 활성화")
+                #endif
             case .failed:
                 self.remoteVideoEnabled = false
+                #if DEBUG
                 print("   ➜ 원격 비디오 실패 - 비활성화")
+                #endif
             @unknown default:
                 break
             }

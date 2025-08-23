@@ -4,6 +4,13 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>5SEC</string>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchScreenBackground</string>
+		<key>UIImageName</key>
+		<string></string>
+	</dict>
 	<key>UIAppFonts</key>
 	<array>
 		<string>CarterOne-Regular.ttf</string>
