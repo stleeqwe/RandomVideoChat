@@ -117,15 +117,9 @@ class StoreKitManager: NSObject, ObservableObject {
                 "lastPurchaseDate": Timestamp(date: Date())
             ])
             
-            // 로컬 상태 업데이트 (이중 증가 방지: Firestore에만 기록, 로컬 모델만 갱신)
-            // UserDefaults도 동기화
-            let currentHearts = UserDefaults.standard.integer(forKey: "heartCount")
-            UserDefaults.standard.set(currentHearts + 1, forKey: "heartCount")
+            // UserManager를 통해 로컬 상태 업데이트 (AppStorage 자동 동기화)
             await MainActor.run {
-                if var user = UserManager.shared.currentUser {
-                    user.heartCount += 1
-                    UserManager.shared.currentUser = user
-                }
+                UserManager.shared.loadCurrentUser(uid: uid)
             }
             
             print("✅ 하트 1개 지급 완료")
@@ -173,10 +167,18 @@ class StoreKitManager: NSObject, ObservableObject {
     
     // MARK: - Price Formatting
     func formatPrice(_ product: Product) -> String {
+        // Product.price는 Decimal 타입이므로 Double로 변환
+        let priceValue = NSDecimalNumber(decimal: product.price).doubleValue
+        
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "ko_KR")
-        let number = NSDecimalNumber(decimal: product.price)
-        return formatter.string(from: number) ?? product.displayPrice
+        
+        if let formattedPrice = formatter.string(from: NSNumber(value: priceValue)) {
+            return formattedPrice
+        }
+        
+        return product.displayPrice
     }
 }
+

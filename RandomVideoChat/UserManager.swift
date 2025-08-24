@@ -425,14 +425,11 @@ class UserManager: ObservableObject {
                 print("❌ 하트 수 변경 실패: \(error)")
                 #endif
             } else {
-                // Firestore 업데이트가 끝나면 로컬 모델도 갱신
-                if var user = self?.currentUser {
-                    user.heartCount += delta
-                    self?.currentUser = user
-                }
                 #if DEBUG
                 print("✅ 하트 수 \(delta > 0 ? "증가" : "감소"): \(delta)")
                 #endif
+                // Firestore에서 최신 데이터 다시 로드하여 완전 동기화
+                self?.loadCurrentUser(uid: uid)
             }
         }
     }

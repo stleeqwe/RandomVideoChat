@@ -102,9 +102,10 @@ class DailyRewardManager {
                 completion(false)
             } else {
                 print("✅ Daily reward granted successfully")
-                // UserDefaults에도 업데이트
-                let currentHearts = UserDefaults.standard.integer(forKey: "heartCount")
-                UserDefaults.standard.set(currentHearts + 1, forKey: "heartCount")
+                // UserManager를 통해 업데이트 (AppStorage 자동 동기화)
+                if let uid = Auth.auth().currentUser?.uid {
+                    UserManager.shared.loadCurrentUser(uid: uid)
+                }
                 completion(true)
             }
         }

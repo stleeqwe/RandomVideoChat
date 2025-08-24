@@ -280,12 +280,9 @@ struct MainView: View {
                 heartCount = 3
             }
         }
-        // 🆕 중요: fullScreenCover 추가!!!
+        // 중요: fullScreenCover 추가
         .fullScreenCover(isPresented: $showMatchingView, onDismiss: {
-            // 매칭 화면 종료 시 카메라 미리보기 재시작
-            if isCameraOn {
-                CameraView.CameraSessionManager.shared.ensureRunning()
-            }
+            // 매칭 화면 종료 시 카메라 재시작은 CameraPreview 내부에서 처리
         }) {
             MatchingView(isPresented: $showMatchingView)
         }
