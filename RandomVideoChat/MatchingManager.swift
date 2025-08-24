@@ -121,7 +121,8 @@ class MatchingManager: ObservableObject {
         let preferredGender = currentUser?.preferredGender?.rawValue ?? "any"
         
         // 버킷과 랜덤 시드 생성 (개선된 매칭 알고리즘)
-        let bucket = "waiting_\(userGender)"
+        // 모든 사용자를 하나의 버킷으로 통합하여 매칭 문제 해결
+        let bucket = "waiting"
         let randomSeed = Int.random(in: 0..<1_000_000)
         
         let myPrefRate = UserManager.shared.currentUser?.preferenceRate ?? 50.0
@@ -234,8 +235,14 @@ class MatchingManager: ObservableObject {
         
         // 1. 내 상태 변화 관찰 (매칭 성공 감지용)
         observeMyStatus(userId: currentUserId)
-        // 2. 클라이언트 폴링 제거: Cloud Function이 매칭을 수행하고
-        //    상태를 업데이트하므로 여기서 주기적 검색을 수행하지 않습니다.
+        
+        // 2. 클라이언트 사이드 매칭 로직 시작
+        // Cloud Function이 없거나 작동하지 않을 경우를 대비
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self = self,
+                  self.isMatching && !self.isMatched else { return }
+            self.findWaitingUsers(currentUserId: currentUserId)
+        }
     }
     
     private func observeMyStatus(userId: String) {
@@ -295,12 +302,8 @@ class MatchingManager: ObservableObject {
     
     // MARK: - Improved Matching Algorithm
     private func candidateBuckets(for myPref: String) -> [String] {
-        // 내 선호 성별에 맞는 상대 버킷
-        if myPref == "" || myPref == "any" {
-            return ["waiting_male", "waiting_female"]
-        } else {
-            return ["waiting_\(myPref)"]
-        }
+        // 모든 사용자가 하나의 버킷 사용
+        return ["waiting"]
     }
     
     private func findWaitingUsers(currentUserId: String) {
@@ -324,7 +327,7 @@ class MatchingManager: ObservableObject {
             
             guard index < buckets.count else {
                 print("⚠️ 후보 없음. 잠시 후 재시도.")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     // 재시도 전에도 매칭 상태 재확인
                     guard self.isMatching && !self.isMatched else {
                         print("🚫 재시도 취소됨 - 매칭 상태 변경")
@@ -339,11 +342,9 @@ class MatchingManager: ObservableObject {
             
             print("🔍 버킷 검색 시작: \(bucket) (내 성별: \(myGender), 내 선호: \(myPref))")
             
-            // 올바른 버킷 쿼리 (Firebase 인덱스가 있으면 최적화됨)
-            matchingRef.queryOrdered(byChild: "bucket")
-                .queryEqual(toValue: bucket)
-                .observeSingleEvent(of: .value) { snapshot in
-                    print("📦 버킷 '\(bucket)' 응답: \(snapshot.childrenCount)개 항목")
+            // 전체 큐를 가져와서 클라이언트에서 필터링 (인덱스 문제 회피)
+            matchingRef.observeSingleEvent(of: .value) { snapshot in
+                    print("📦 전체 큐 응답: \(snapshot.childrenCount)개 항목")
                     var candidates: [[String: Any]] = []
                     
                     for child in snapshot.children {
@@ -356,6 +357,11 @@ class MatchingManager: ObservableObject {
                         let status = dict["status"] as? String ?? "waiting"
                         let userId = dict["userId"] as? String ?? snap.key
                         let userBucket = dict["bucket"] as? String ?? "none"
+                        
+                        // 버킷 필터링
+                        if userBucket != bucket {
+                            continue
+                        }
                         
                         print("👤 후보 분석: \(userId)")
                         print("   - 상태: \(status)")
@@ -648,13 +654,15 @@ class MatchingManager: ObservableObject {
         
         print("🚀 매칭 확정 진행 시작 [tier=\(prefTier ?? "unknown")] opponent=\(opponentId)")
         
-        // 1) 매칭 확정(멀티 로케이션 업데이트)
+        // 1) 매칭 확정(멀티 로케이션 업데이트) - ready 상태 추가
         let updates: [String: Any] = [
             "matches/\(matchId)/status": "active",
             "matches/\(matchId)/user1": currentUserId,
             "matches/\(matchId)/user2": opponentId,
             "matches/\(matchId)/channelName": channelName,
             "matches/\(matchId)/timestamp": ServerValue.timestamp(),
+            "matches/\(matchId)/user1Ready": false,
+            "matches/\(matchId)/user2Ready": false,
             "matching_queue/\(currentUserId)/status": "matched",
             "matching_queue/\(currentUserId)/matchId": matchId,
             "matching_queue/\(currentUserId)/channelName": channelName,

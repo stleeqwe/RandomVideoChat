@@ -145,7 +145,9 @@ class AgoraManager: NSObject, ObservableObject {
         #if DEBUG
         print("📱 AgoraManager: startCall - 채널: \(channel)")
         print("📱 채널 길이: \(channel.count) (최대 64자)")
-        print("📱 App ID: \(appId)")  // 🆕 App ID 확인
+        print("📱 App ID: \(appId)")
+        print("📱 현재 통화 상태: \(isInCall)")
+        print("📱 원격 사용자 참가: \(remoteUserJoined)")
         #endif
         
         // 채널 이름 유효성 검사
@@ -156,6 +158,12 @@ class AgoraManager: NSObject, ObservableObject {
             return
         }
         
+        // 원격 사용자 상태 초기화
+        self.remoteUserJoined = false
+        self.remoteVideoEnabled = false
+        self.remoteUserId = 0
+        self.remoteVideoView = nil
+        
         // 엔진 상태 확인
         guard let engine = agoraKit else {
             #if DEBUG
@@ -163,7 +171,7 @@ class AgoraManager: NSObject, ObservableObject {
             #endif
             setupAgoraEngine()
             
-            // 🆕 재시도
+            // 재시도
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 self?.startCall(channel: channel)
             }
@@ -179,7 +187,7 @@ class AgoraManager: NSObject, ObservableObject {
         options.clientRoleType = .broadcaster  // 명시적으로 broadcaster
         options.autoSubscribeVideo = true
         options.autoSubscribeAudio = true
-        options.channelProfile = .communication  // 🆕 1:1 통화 명시
+        options.channelProfile = .communication  // 1:1 통화 명시
         
         // 토큰 요청 후 채널 참가
         fetchAgoraToken(for: channel) { [weak self] token in
@@ -308,30 +316,89 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         DispatchQueue.main.async {
             self.isInCall = true
         }
+        
+        // 원격 스트림 구독 즉시 활성화
+        agoraKit?.muteAllRemoteVideoStreams(false)
+        agoraKit?.muteAllRemoteAudioStreams(false)
+        
+        // 채널에 이미 있는 사용자 확인을 위한 빠른 체크 (1초 후)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self = self else { return }
+            if !self.remoteUserJoined {
+                print("⚠️ 1초 경과 - 원격 사용자 체크 시작")
+                self.checkRemoteUsersInChannel()
+            }
+        }
+        
+        // 추가 체크 (3초 후)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self else { return }
+            if !self.remoteUserJoined {
+                print("⚠️ 3초 경과 후에도 원격 사용자 미참가 - 재확인")
+                self.checkRemoteUsersInChannel()
+            }
+        }
     }
     
     // 원격 사용자가 채널에 참가
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinedOfUid uid: UInt, elapsed: Int) {
         #if DEBUG
-        print("👤 원격 사용자 참가: \(uid)")
+        print("👤 원격 사용자 참가: \(uid), 경과시간: \(elapsed)ms")
+        print("   - 로컬 사용자 ID: \(localUserId)")
+        print("   - 현재 원격 사용자 ID: \(remoteUserId)")
         #endif
+        
+        // 자기 자신의 UID가 아닌지 확인
+        guard uid != localUserId else {
+            print("⚠️ 자신의 UID 무시: \(uid)")
+            return
+        }
+        
+        // 중복 처리 방지
+        guard remoteUserId == 0 || remoteUserId != uid else {
+            print("⚠️ 이미 처리된 원격 사용자: \(uid)")
+            return
+        }
         
         remoteUserId = uid
         
-        // 원격 비디오 설정
-        let videoCanvas = AgoraRtcVideoCanvas()
-        videoCanvas.uid = uid
-        videoCanvas.renderMode = .hidden
-        
-        let view = UIView()
-        videoCanvas.view = view
-        
-        agoraKit?.setupRemoteVideo(videoCanvas)
-        
-        DispatchQueue.main.async {
+        // 메인 스레드에서 즉시 처리
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            print("🎬 원격 비디오 설정 시작...")
+            
+            // 새로운 뷰 생성
+            let view = UIView()
+            view.backgroundColor = .black
+            
+            // 비디오 캔버스 설정
+            let videoCanvas = AgoraRtcVideoCanvas()
+            videoCanvas.uid = uid
+            videoCanvas.view = view
+            videoCanvas.renderMode = .hidden
+            videoCanvas.mirrorMode = .disabled
+            
+            // 원격 비디오 설정
+            let setupResult = self.agoraKit?.setupRemoteVideo(videoCanvas)
+            print("   - setupRemoteVideo 결과: \(setupResult ?? -999)")
+            
+            // 원격 비디오/오디오 구독 명시적 설정
+            self.agoraKit?.muteRemoteVideoStream(uid, mute: false)
+            self.agoraKit?.muteRemoteAudioStream(uid, mute: false)
+            
+            // 원격 스트림 우선순위 설정 - API 제거 (deprecated)
+            
+            // 원격 비디오 구독 활성화
+            self.agoraKit?.setRemoteSubscribeFallbackOption(.audioOnly)
+            
             self.remoteVideoView = view
             self.remoteUserJoined = true
-            self.remoteVideoEnabled = true  // 사용자 참가 시 비디오 활성화
+            self.remoteVideoEnabled = true
+            
+            print("✅ 원격 비디오 설정 완료: UID \(uid)")
+            print("   - remoteUserJoined: \(self.remoteUserJoined)")
+            print("   - remoteVideoEnabled: \(self.remoteVideoEnabled)")
         }
     }
     
@@ -416,25 +483,102 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         print("📹 원격 비디오 상태 변경: UID \(uid), 상태: \(state.rawValue), 이유: \(reason.rawValue)")
         #endif
         
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             switch state {
             case .stopped, .frozen:
                 self.remoteVideoEnabled = false
                 #if DEBUG
                 print("   ➜ 원격 비디오 비활성화")
                 #endif
-            case .starting, .decoding:
+                
+            case .starting:
+                // 비디오가 시작되면 원격 사용자 설정 재시도
+                if self.remoteVideoView == nil && uid != 0 {
+                    print("   ➜ 원격 비디오 시작 - 설정 재시도")
+                    self.setupRemoteUserVideo(uid: uid)
+                }
+                self.remoteVideoEnabled = true
+                
+            case .decoding:
                 self.remoteVideoEnabled = true
                 #if DEBUG
                 print("   ➜ 원격 비디오 활성화")
                 #endif
+                
             case .failed:
                 self.remoteVideoEnabled = false
                 #if DEBUG
-                print("   ➜ 원격 비디오 실패 - 비활성화")
+                print("   ➜ 원격 비디오 실패 - 재시도")
                 #endif
+                // 실패 시 재시도
+                if uid != 0 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                        self?.setupRemoteUserVideo(uid: uid)
+                    }
+                }
+                
             @unknown default:
                 break
+            }
+        }
+    }
+    
+    // 원격 사용자 비디오 설정 헬퍼 함수
+    private func setupRemoteUserVideo(uid: UInt) {
+        guard remoteVideoView == nil else {
+            print("⚠️ 원격 비디오 뷰가 이미 설정됨")
+            return
+        }
+        
+        let videoCanvas = AgoraRtcVideoCanvas()
+        videoCanvas.uid = uid
+        videoCanvas.renderMode = .hidden
+        videoCanvas.mirrorMode = .disabled
+        
+        let view = UIView()
+        videoCanvas.view = view
+        
+        agoraKit?.setupRemoteVideo(videoCanvas)
+        
+        // 원격 스트림 구독 명시적 설정
+        agoraKit?.muteRemoteVideoStream(uid, mute: false)
+        agoraKit?.muteRemoteAudioStream(uid, mute: false)
+        
+        remoteVideoView = view
+        remoteUserId = uid
+        remoteUserJoined = true
+        remoteVideoEnabled = true
+        
+        print("✅ 원격 비디오 재설정 완료: UID \(uid)")
+    }
+    
+    // 채널의 원격 사용자 확인
+    private func checkRemoteUsersInChannel() {
+        // 이미 참가한 사용자가 있는지 확인하는 로직
+        // Agora SDK는 이미 참가한 사용자에 대해 콜백을 제공하지 않을 수 있음
+        print("🔍 채널 내 원격 사용자 확인 중...")
+        print("   - 현재 채널: \(channelName)")
+        print("   - 로컬 UID: \(localUserId)")
+        
+        // 원격 사용자가 이미 있지만 콜백이 오지 않은 경우를 위한 대비
+        if !remoteUserJoined {
+            print("⚠️ 원격 사용자 콜백 미수신 - 강제 비디오 스트림 구독 시도")
+            
+            // 모든 원격 스트림 구독 활성화
+            agoraKit?.muteAllRemoteVideoStreams(false)
+            agoraKit?.muteAllRemoteAudioStreams(false)
+            
+            // 원격 비디오 폴백 옵션 설정
+            agoraKit?.setRemoteSubscribeFallbackOption(.audioOnly)
+            
+            // 다시 한번 체크 (5초 후)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+                guard let self = self else { return }
+                if !self.remoteUserJoined {
+                    print("⚠️ 5초 후에도 원격 사용자 미참가 - 연결 문제 가능성")
+                }
             }
         }
     }
@@ -509,16 +653,27 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     // MARK: - Token Handling
     private func fetchAgoraToken(for channel: String, completion: @escaping (String?) -> Void) {
         #if canImport(FirebaseFunctions)
+        // 토큰 요청 타임아웃 설정
+        let timeoutWorkItem = DispatchWorkItem {
+            print("⏱️ 토큰 요청 타임아웃 - 토큰 없이 진행")
+            completion(nil)
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: timeoutWorkItem)
+        
         functions.httpsCallable("generateAgoraToken").call(["channelName": channel]) { result, error in
+            timeoutWorkItem.cancel()
+            
             if let error = error {
-                print("⚠️ 토큰 요청 실패: \(error.localizedDescription). 토큰 없이 시도합니다 (DEBUG).")
+                print("⚠️ 토큰 요청 실패: \(error.localizedDescription). 토큰 없이 시도합니다.")
                 completion(nil)
                 return
             }
             if let dict = result?.data as? [String: Any], let token = dict["token"] as? String {
+                print("✅ 토큰 발급 성공")
                 completion(token)
             } else {
-                print("⚠️ 토큰 응답 파싱 실패. 토큰 없이 시도합니다 (DEBUG).")
+                print("⚠️ 토큰 응답 파싱 실패. 토큰 없이 시도합니다.")
                 completion(nil)
             }
         }

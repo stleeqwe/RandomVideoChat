@@ -211,9 +211,8 @@ struct VideoCallView: View {
                         }
                         
                         if let uid = Auth.auth().currentUser?.uid {
-                            // 1) UI를 즉시 업데이트
+                            // 1) AppStorage를 통해 UI 자동 업데이트
                             heartCount -= 1
-                            UserDefaults.standard.set(heartCount, forKey: "heartCount")
                             
                             // 2) 타이머 +60초
                             timeRemaining += 60
@@ -427,7 +426,7 @@ struct VideoCallView: View {
                 isBackground = false
                 backgroundStartTime = nil
                 
-                // 예약된 종료 작업 취소 및 초기화
+                // 예약된 종료 작업 안전하게 취소
                 backgroundTerminationWorkItem?.cancel()
                 backgroundTerminationWorkItem = nil
                 
@@ -464,10 +463,9 @@ struct VideoCallView: View {
             .child("newHeart")
             .observe(.childAdded) { snapshot in
                 
-                // 로컬 UI에서 즉시 반영
+                // AppStorage를 통해 UI 자동 업데이트
                 DispatchQueue.main.async {
                     heartCount += 1
-                    UserDefaults.standard.set(heartCount, forKey: "heartCount")
                 }
                 
                 // 서버에 +1 원자적 증가 (FieldValue.increment 사용)
@@ -494,17 +492,10 @@ struct VideoCallView: View {
     }
     
     private func setupCameraState() {
-        // 메인화면에서 설정한 카메라 상태 복원
-        isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
-        // 기본값이 false이므로 한번도 설정하지 않았다면 true로 설정
-        if UserDefaults.standard.object(forKey: "isCameraOn") == nil {
-            isCameraOn = true
-            UserDefaults.standard.set(true, forKey: "isCameraOn")
-        }
-        
-        // Agora 카메라 상태도 동기화
+        // AppStorage를 통해 자동으로 동기화되므로 추가 설정 불필요
+        // Agora 카메라 상태만 동기화
         if !isCameraOn {
-            _ = AgoraManager.shared.toggleCamera()
+            _ = agoraManager.toggleCamera()
         }
     }
     
@@ -584,9 +575,74 @@ struct VideoCallView: View {
     
     func startVideoCall() {
         isCallActive = true
-        if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {
-            agoraManager.startCall(channel: channelName)
+        
+        guard let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
+              let matchId = UserDefaults.standard.string(forKey: "currentMatchId"),
+              let currentUserId = Auth.auth().currentUser?.uid else {
+            print("❌ 채널 정보 또는 사용자 정보 없음")
+            return
         }
+        
+        // Ready 상태를 설정하고 상대방 대기
+        let matchRef = Database.database().reference().child("matches").child(matchId)
+        
+        // 자신이 user1인지 user2인지 확인
+        matchRef.observeSingleEvent(of: .value) { snapshot in
+            guard let data = snapshot.value as? [String: Any],
+                  let user1 = data["user1"] as? String,
+                  let user2 = data["user2"] as? String else {
+                print("❌ 매치 정보 읽기 실패")
+                return
+            }
+            
+            let isUser1 = (user1 == currentUserId)
+            let myReadyKey = isUser1 ? "user1Ready" : "user2Ready"
+            let otherReadyKey = isUser1 ? "user2Ready" : "user1Ready"
+            
+            print("🔍 내 역할: \(isUser1 ? "user1" : "user2")")
+            print("🔍 채널명: \(channelName)")
+            
+            // 상대방 준비 상태를 먼저 확인
+            matchRef.child(otherReadyKey).observeSingleEvent(of: .value) { snapshot in
+                let otherReady = (snapshot.value as? Bool) ?? false
+                print("🔍 상대방 현재 준비 상태: \(otherReady)")
+                
+                // 내 준비 상태를 true로 설정
+                matchRef.child(myReadyKey).setValue(true) { error, _ in
+                    if let error = error {
+                        print("❌ Ready 상태 설정 실패: \(error)")
+                        return
+                    }
+                    
+                    print("✅ 내 준비 상태 설정 완료")
+                    
+                    if otherReady {
+                        // 상대방이 이미 준비됨 - 즉시 채널 참가
+                        print("✅ 상대방이 이미 준비됨 - 즉시 채널 참가")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.agoraManager.startCall(channel: channelName)
+                        }
+                    } else {
+                        // 상대방 준비 상태 실시간 관찰
+                        matchRef.child(otherReadyKey).observe(.value) { snapshot in
+                            if let isReady = snapshot.value as? Bool, isReady {
+                                print("✅ 상대방도 준비 완료 - 채널 참가")
+                                
+                                // 두 사용자가 거의 동시에 참가하도록 약간의 지연 추가
+                                let delay = isUser1 ? 0.2 : 0.4  // user1이 약간 먼저 참가
+                                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                    self.agoraManager.startCall(channel: channelName)
+                                }
+                                
+                                // 리스너 제거
+                                matchRef.child(otherReadyKey).removeAllObservers()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         // 통화 시작 시 통화 횟수 증가 및 선호도 갱신
         UserManager.shared.incrementCallCount()
     }
@@ -658,5 +714,14 @@ struct VideoCallView: View {
         
         // 차단 후 즉시 통화 종료
         endVideoCall()
+    }
+}
+
+// MARK: - Preview for VideoCallView
+struct VideoCallView_Previews: PreviewProvider {
+    static var previews: some View {
+        VideoCallView()
+            .environmentObject(AgoraManager.shared)
+            .environmentObject(MatchingManager.shared)
     }
 }
