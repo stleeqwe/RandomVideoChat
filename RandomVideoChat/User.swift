@@ -37,6 +37,11 @@ struct User: Codable {
     var ageVerified: Bool
     var authProvider: String?
     
+    // Preference-based matching fields
+    var totalCallCount: Int
+    var uniqueHeartGivers: [String]
+    var preferenceRate: Double
+    
     init(uid: String, email: String? = nil, displayName: String? = nil) {
         self.uid = uid
         self.email = email
@@ -49,6 +54,9 @@ struct User: Codable {
         self.birthDate = nil
         self.ageVerified = false
         self.authProvider = "anonymous"
+        self.totalCallCount = 0
+        self.uniqueHeartGivers = []
+        self.preferenceRate = 50.0
     }
     
     // Firestore 데이터로 변환
@@ -63,7 +71,10 @@ struct User: Codable {
             "gender": gender?.rawValue ?? "",
             "preferredGender": preferredGender?.rawValue ?? "",
             "ageVerified": ageVerified,
-            "authProvider": authProvider ?? "anonymous"
+            "authProvider": authProvider ?? "anonymous",
+            "totalCallCount": totalCallCount,
+            "uniqueHeartGivers": uniqueHeartGivers,
+            "preferenceRate": preferenceRate
         ]
         
         if let birthDate = birthDate {

@@ -124,6 +124,11 @@ class MatchingManager: ObservableObject {
         let bucket = "waiting_\(userGender)"
         let randomSeed = Int.random(in: 0..<1_000_000)
         
+        let myPrefRate = UserManager.shared.currentUser?.preferenceRate ?? 50.0
+        let lower = max(0, Int(myPrefRate / 10) * 10)
+        let upper = min(100, lower + 10)
+        let prefRange = "\(lower)-\(upper)"
+
         let userData: [String: Any] = [
             "userId": currentUserId,
             "timestamp": ServerValue.timestamp(),
@@ -133,7 +138,9 @@ class MatchingManager: ObservableObject {
             "gender": userGender,
             "preferredGender": preferredGender,
             "bucket": bucket,
-            "randomSeed": randomSeed
+            "randomSeed": randomSeed,
+            "preferenceRate": myPrefRate,
+            "preferenceRange": prefRange
         ]
 
         // 기존 데이터가 있어도 덮어쓰기만 함 (노드 삭제 없음)
@@ -410,19 +417,85 @@ class MatchingManager: ObservableObject {
                     } else {
                         print("✅ 후보 \(candidates.count)개로 매칭 시도")
                     }
-                    
-                    // 3) 의사 랜덤: pivot에 가장 가까운 randomSeed 선택(원형 거리)
-                    candidates.sort {
-                        let a = $0["randomSeed"] as? Int ?? 0
-                        let b = $1["randomSeed"] as? Int ?? 0
-                        let da = min(abs(a - pivot), 1_000_000 - abs(a - pivot))
-                        let db = min(abs(b - pivot), 1_000_000 - abs(b - pivot))
-                        return da < db
+
+                    // 3) 선호도 범위 기반 확장 로직: 동일 범위 → 인접 범위 → 전체
+                    let myRate = UserManager.shared.currentUser?.preferenceRate ?? 50.0
+                    let myLower = max(0, min(100, (Int(myRate) / 10) * 10))
+                    func rangeString(_ lower: Int) -> String { "\(lower)-\(min(100, lower + 10))" }
+                    let myRange = rangeString(myLower)
+                    let lowNeighbor = myLower - 10
+                    let highNeighbor = myLower + 10
+
+                    // 그룹 분할
+                    let sameRange = candidates.filter { ($0["preferenceRange"] as? String) == myRange }
+                    let adjacentRanges: [[String: Any]] = {
+                        var arr: [[String: Any]] = []
+                        if lowNeighbor >= 0 {
+                            let r = rangeString(lowNeighbor)
+                            arr.append(contentsOf: candidates.filter { ($0["preferenceRange"] as? String) == r })
+                        }
+                        if highNeighbor <= 100 {
+                            let r = rangeString(highNeighbor)
+                            arr.append(contentsOf: candidates.filter { ($0["preferenceRange"] as? String) == r })
+                        }
+                        return arr
+                    }()
+                    var others = candidates.filter {
+                        let r = ($0["preferenceRange"] as? String) ?? ""
+                        return r != myRange && r != rangeString(lowNeighbor) && r != rangeString(highNeighbor)
                     }
-                    
+
+                    // 정렬 함수: 선호도 차이 → 랜덤성 보조
+                    func sortByPreferenceThenRandom(_ list: inout [[String: Any]]) {
+                        list.sort {
+                            let ar = $0["preferenceRate"] as? Double ?? 50.0
+                            let br = $1["preferenceRate"] as? Double ?? 50.0
+                            let ad = abs(ar - myRate)
+                            let bd = abs(br - myRate)
+                            if ad == bd {
+                                let a = $0["randomSeed"] as? Int ?? 0
+                                let b = $1["randomSeed"] as? Int ?? 0
+                                let da = min(abs(a - pivot), 1_000_000 - abs(a - pivot))
+                                let db = min(abs(b - pivot), 1_000_000 - abs(b - pivot))
+                                return da < db
+                            }
+                            return ad < bd
+                        }
+                    }
+
+                    let sameCount = sameRange.count
+                    let adjCount = adjacentRanges.count
+                    let othCount = others.count
+                    print("🧭 선호도 티어 분포 - same: \(sameCount), adjacent: \(adjCount), global: \(othCount)")
+
+                    var prioritized: [[String: Any]] = []
+                    var firstTierUsed = "unknown"
+                    if !sameRange.isEmpty {
+                        var s = sameRange
+                        sortByPreferenceThenRandom(&s)
+                        s = s.map { var d = $0; d["prefTier"] = "same"; return d }
+                        prioritized.append(contentsOf: s)
+                        firstTierUsed = "same"
+                    }
+                    if prioritized.isEmpty && !adjacentRanges.isEmpty {
+                        var a = adjacentRanges
+                        sortByPreferenceThenRandom(&a)
+                        a = a.map { var d = $0; d["prefTier"] = "adjacent"; return d }
+                        prioritized.append(contentsOf: a)
+                        firstTierUsed = "adjacent"
+                    }
+                    if prioritized.isEmpty {
+                        sortByPreferenceThenRandom(&others)
+                        others = others.map { var d = $0; d["prefTier"] = "global"; return d }
+                        prioritized.append(contentsOf: others)
+                        firstTierUsed = "global"
+                    }
+
+                    print("🎚 우선 사용 티어: \(firstTierUsed)")
+
                     self.tryLockAndFinalize(currentUserId: currentUserId,
                                             myGender: myGender,
-                                            candidateList: candidates,
+                                            candidateList: prioritized,
                                             index: 0,
                                             onExhausted: {
                                                 tryBucket(index + 1)
@@ -451,8 +524,9 @@ class MatchingManager: ObservableObject {
         
         let candidate = candidateList[index]
         let opponentId = candidate["userId"] as? String ?? ""
+        let prefTier = candidate["prefTier"] as? String ?? "unknown"
         
-        print("🎯 매칭 시도 대상: \(opponentId)")
+        print("🎯 매칭 시도 대상: \(opponentId) [tier=\(prefTier)]")
         
         // 매칭 ID와 채널명 미리 생성
         let matchId = UUID().uuidString
@@ -549,6 +623,7 @@ class MatchingManager: ObservableObject {
                                                      opponentId: opponentId,
                                                      matchId: matchId,
                                                      channelName: channelName,
+                                                     prefTier: prefTier,
                                                      lockRef: lockRef)
                         } else {
                             print("❌ 락 획득 실패 - 다른 클라이언트가 우선 (winner: \(winner), timestamp: \(winnerTimestamp) vs \(myTimestamp))")
@@ -569,9 +644,10 @@ class MatchingManager: ObservableObject {
                                      opponentId: String,
                                      matchId: String,
                                      channelName: String,
+                                     prefTier: String?,
                                      lockRef: DatabaseReference) {
         
-        print("🚀 매칭 확정 진행 시작")
+        print("🚀 매칭 확정 진행 시작 [tier=\(prefTier ?? "unknown")] opponent=\(opponentId)")
         
         // 1) 매칭 확정(멀티 로케이션 업데이트)
         let updates: [String: Any] = [

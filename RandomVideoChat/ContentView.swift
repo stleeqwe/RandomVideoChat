@@ -60,6 +60,23 @@ struct ContentView: View {
     }
     
     func checkAuthStatus() {
+        // Check if this is a fresh install (after app deletion)
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+        
+        if !hasLaunchedBefore {
+            // First launch after fresh install - clear any lingering auth state
+            print("🆕 Fresh install detected - clearing auth state")
+            do {
+                try Auth.auth().signOut()
+            } catch {
+                print("❌ Error signing out: \(error)")
+            }
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            isAuthenticated = false
+            isCheckingAuth = false
+            return
+        }
+        
         // Check for existing authenticated user
         if let user = Auth.auth().currentUser {
             print("✅ Found existing user: \(user.uid) - Auto login")

@@ -44,6 +44,9 @@
 		88SET0012E50000001234567 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SET0002E50000001234567 /* SettingsView.swift */; };
 		88SGN0012EA0000001234567 /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SGN0002EA0000001234567 /* SignUpView.swift */; };
 		88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SWP0002E80000001234567 /* SwipeHintView.swift */; };
+		88ABCD001122334455667701 /* HeartPurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667700 /* HeartPurchaseView.swift */; };
+		88ABCD001122334455667703 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667702 /* StoreKitManager.swift */; };
+		88ABCD001122334455667706 /* DailyRewardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667704 /* DailyRewardManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -98,6 +101,9 @@
 		88SET0002E50000001234567 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		88SGN0002EA0000001234567 /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		88SWP0002E80000001234567 /* SwipeHintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeHintView.swift; sourceTree = "<group>"; };
+		88ABCD001122334455667700 /* HeartPurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartPurchaseView.swift; sourceTree = "<group>"; };
+		88ABCD001122334455667702 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
+		88ABCD001122334455667704 /* DailyRewardManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRewardManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -184,6 +190,9 @@
 				88SWP0002E80000001234567 /* SwipeHintView.swift */,
 				88APP0002E90000001234567 /* AppleSignInView.swift */,
 				88SGN0002EA0000001234567 /* SignUpView.swift */,
+				88ABCD001122334455667700 /* HeartPurchaseView.swift */,
+				88ABCD001122334455667702 /* StoreKitManager.swift */,
+				88ABCD001122334455667704 /* DailyRewardManager.swift */,
 			);
 			path = RandomVideoChat;
 			sourceTree = "<group>";
@@ -381,6 +390,9 @@
 				88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */,
 				88APP0012E90000001234567 /* AppleSignInView.swift in Sources */,
 				88SGN0012EA0000001234567 /* SignUpView.swift in Sources */,
+				88ABCD001122334455667701 /* HeartPurchaseView.swift in Sources */,
+				88ABCD001122334455667703 /* StoreKitManager.swift in Sources */,
+				88ABCD001122334455667706 /* DailyRewardManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -273,7 +273,18 @@ class AgoraManager: NSObject, ObservableObject {
     // MARK: - 카메라 토글
     func toggleCamera() -> Bool {
         isCameraOff.toggle()
-        agoraKit?.muteLocalVideoStream(isCameraOff)
+        
+        // muteLocalVideoStream 대신 enableLocalVideo 사용하여 실제로 카메라를 끄고 켬
+        // 이렇게 하면 카메라 재활성화 시 깜빡거림이 줄어듦
+        agoraKit?.enableLocalVideo(!isCameraOff)
+        
+        // 카메라를 다시 켤 때 preview를 먼저 시작
+        if !isCameraOff {
+            agoraKit?.startPreview()
+        } else {
+            agoraKit?.stopPreview()
+        }
+        
         #if DEBUG
         print("📹 카메라: \(isCameraOff ? "OFF" : "ON")")
         #endif

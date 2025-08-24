@@ -14,6 +14,8 @@ struct MainView: View {
     @State private var showPermissionAlert = false
     @State private var permissionMessage = ""
     @State private var showSettings = false
+    @State private var showDailyRewardAlert = false
+    @State private var dailyRewardMessage = ""
     
     // 로컬 성별 상태 관리
     @State private var myGender: Gender?
@@ -180,6 +182,13 @@ struct MainView: View {
                         let blockedCount = UserManager.shared.currentUser?.blockedUsers.count ?? 0
                         Text("영구 차단: \(blockedCount)명")
                             .font(.caption2)
+                        // 선호도 기반 매칭 디버그 정보
+                        let prefRate = UserManager.shared.currentUser?.preferenceRate ?? 50.0
+                        let totalCalls = UserManager.shared.currentUser?.totalCallCount ?? 0
+                        Text(String(format: "선호도: %.1f%%", prefRate))
+                            .font(.caption2)
+                        Text("통화 횟수: \(totalCalls)회")
+                            .font(.caption2)
                     }
                     .padding(5)
                     .background(Color.black.opacity(0.7))
@@ -251,6 +260,21 @@ struct MainView: View {
             if let uid = Auth.auth().currentUser?.uid {
                 userManager.loadCurrentUser(uid: uid)
             }
+            
+            // 일일 출석 보상 체크
+            DailyRewardManager.shared.checkAndGrantDailyReward { granted, message in
+                if granted, let message = message {
+                    DispatchQueue.main.async {
+                        self.dailyRewardMessage = message
+                        self.showDailyRewardAlert = true
+                    }
+                }
+            }
+        }
+        .alert("출석 보상", isPresented: $showDailyRewardAlert) {
+            Button("확인") { }
+        } message: {
+            Text(dailyRewardMessage)
         }
         .onReceive(userManager.$currentUser) { user in
             // Firestore에서 가져온 값 우선 사용

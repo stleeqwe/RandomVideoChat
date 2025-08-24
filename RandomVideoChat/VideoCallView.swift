@@ -472,6 +472,12 @@ struct VideoCallView: View {
                 // 서버에 +1 원자적 증가 (FieldValue.increment 사용)
                 userManager.changeHeartCount(uid: uid, delta: +1)
                 
+                // 고유 하트 발신자 기록 및 선호도 갱신
+                if let dict = snapshot.value as? [String: Any],
+                   let fromId = dict["from"] as? String {
+                    UserManager.shared.recordHeartReceived(from: fromId)
+                }
+                
                 // 알림 데이터 삭제
                 snapshot.ref.removeValue()
             }
@@ -580,6 +586,8 @@ struct VideoCallView: View {
         if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {
             AgoraManager.shared.startCall(channel: channelName)
         }
+        // 통화 시작 시 통화 횟수 증가 및 선호도 갱신
+        UserManager.shared.incrementCallCount()
     }
 
     func startTimer() {

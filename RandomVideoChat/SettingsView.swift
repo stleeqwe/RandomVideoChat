@@ -10,11 +10,35 @@ struct SettingsView: View {
     @State private var showDeleteResult = false
     @State private var deleteSuccess = false
     @State private var deleteMessage = ""
+    @State private var showHeartPurchase = false
     @StateObject private var userManager = UserManager.shared
     
     var body: some View {
         NavigationView {
             List {
+                // 하트 구매 섹션
+                Section {
+                    Button(action: {
+                        showHeartPurchase = true
+                    }) {
+                        HStack {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                            Text("하트 구매")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Text("\(userManager.currentUser?.heartCount ?? 0)개 보유")
+                                .foregroundColor(.gray)
+                                .font(.system(size: 14))
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                                .font(.system(size: 14))
+                        }
+                    }
+                } header: {
+                    Text("상점")
+                }
+                
                 Section {
                     // 이용약관
                     Link(destination: URL(string: "https://5sec-terms.web.app/terms")!) {
@@ -97,6 +121,9 @@ struct SettingsView: View {
             if let uid = Auth.auth().currentUser?.uid {
                 userManager.loadCurrentUser(uid: uid)
             }
+        }
+        .sheet(isPresented: $showHeartPurchase) {
+            HeartPurchaseView()
         }
         .alert("계정 삭제", isPresented: $showDeleteAccountAlert) {
             Button("취소", role: .cancel) { }

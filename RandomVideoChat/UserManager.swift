@@ -58,6 +58,9 @@ class UserManager: ObservableObject {
                 let ageVerified = data["ageVerified"] as? Bool ?? false
                 let authProvider = data["authProvider"] as? String ?? "anonymous"
                 let birthDateTimestamp = data["birthDate"] as? Timestamp
+                let totalCallCount = data["totalCallCount"] as? Int ?? 0
+                let uniqueHeartGivers = data["uniqueHeartGivers"] as? [String] ?? []
+                let preferenceRate = data["preferenceRate"] as? Double ?? 50.0
                 
                 // User 생성 - User의 실제 초기화 함수에 맞게
                 var user = User(uid: uid, email: email, displayName: displayName)
@@ -68,6 +71,9 @@ class UserManager: ObservableObject {
                 user.ageVerified = ageVerified
                 user.authProvider = authProvider
                 user.birthDate = birthDateTimestamp?.dateValue()
+                user.totalCallCount = totalCallCount
+                user.uniqueHeartGivers = uniqueHeartGivers
+                user.preferenceRate = preferenceRate
                 self?.currentUser = user
                 
                 #if DEBUG
@@ -85,7 +91,10 @@ class UserManager: ObservableObject {
             "uid": uid,
             "heartCount": 3,
             "blockedUsers": [],
-            "createdAt": Timestamp(date: Date())
+            "createdAt": Timestamp(date: Date()),
+            "totalCallCount": 0,
+            "uniqueHeartGivers": [],
+            "preferenceRate": 50.0
         ]
         
         db.collection("users").document(uid).setData(userData) { [weak self] error in
@@ -102,7 +111,96 @@ class UserManager: ObservableObject {
             }
         }
     }
-    
+
+    // MARK: - Preference-based Matching Helpers
+    private func calculatePreferenceRate(callCount: Int, uniqueGivers: Int) -> Double {
+        guard callCount >= 5 else { return 50.0 }
+        guard callCount > 0 else { return 50.0 }
+        return (Double(uniqueGivers) / Double(callCount)) * 100.0
+    }
+
+    func incrementCallCount() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let userRef = db.collection("users").document(uid)
+        db.runTransaction({ (transaction, errorPointer) -> Any? in
+            do {
+                let snapshot = try transaction.getDocument(userRef)
+                var data = snapshot.data() ?? [:]
+                let currentCount = data["totalCallCount"] as? Int ?? 0
+                let uniqueGivers = (data["uniqueHeartGivers"] as? [String] ?? []).count
+                let newCount = currentCount + 1
+                let newRate = self.calculatePreferenceRate(callCount: newCount, uniqueGivers: uniqueGivers)
+                transaction.updateData([
+                    "totalCallCount": newCount,
+                    "preferenceRate": newRate
+                ], forDocument: userRef)
+                return nil
+            } catch let err as NSError {
+                errorPointer?.pointee = err
+                return nil
+            }
+        }) { [weak self] (_, error) in
+            if error == nil {
+                // Update local model
+                if var user = self?.currentUser {
+                    user.totalCallCount += 1
+                    user.preferenceRate = self?.calculatePreferenceRate(callCount: user.totalCallCount, uniqueGivers: user.uniqueHeartGivers.count) ?? user.preferenceRate
+                    self?.currentUser = user
+                }
+                #if DEBUG
+                print("✅ totalCallCount 증가 및 선호도 갱신")
+                #endif
+            } else {
+                #if DEBUG
+                print("❌ totalCallCount 증가 실패: \(error!.localizedDescription)")
+                #endif
+            }
+        }
+    }
+
+    func recordHeartReceived(from giverId: String) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        guard !giverId.isEmpty else { return }
+        let userRef = db.collection("users").document(uid)
+        db.runTransaction({ (transaction, errorPointer) -> Any? in
+            do {
+                let snapshot = try transaction.getDocument(userRef)
+                var data = snapshot.data() ?? [:]
+                var givers = data["uniqueHeartGivers"] as? [String] ?? []
+                let callCount = data["totalCallCount"] as? Int ?? 0
+                if !givers.contains(giverId) {
+                    givers.append(giverId)
+                    let newRate = self.calculatePreferenceRate(callCount: callCount, uniqueGivers: givers.count)
+                    transaction.updateData([
+                        "uniqueHeartGivers": givers,
+                        "preferenceRate": newRate
+                    ], forDocument: userRef)
+                }
+                return nil
+            } catch let err as NSError {
+                errorPointer?.pointee = err
+                return nil
+            }
+        }) { [weak self] (_, error) in
+            if error == nil {
+                if var user = self?.currentUser {
+                    if !user.uniqueHeartGivers.contains(giverId) {
+                        user.uniqueHeartGivers.append(giverId)
+                        user.preferenceRate = self?.calculatePreferenceRate(callCount: user.totalCallCount, uniqueGivers: user.uniqueHeartGivers.count) ?? user.preferenceRate
+                        self?.currentUser = user
+                    }
+                }
+                #if DEBUG
+                print("✅ uniqueHeartGivers 업데이트 및 선호도 갱신")
+                #endif
+            } else {
+                #if DEBUG
+                print("❌ uniqueHeartGivers 업데이트 실패: \(error!.localizedDescription)")
+                #endif
+            }
+        }
+    }
+
     // MARK: - Heart Management
     func updateHeartCount(uid: String, newCount: Int) {
         db.collection("users").document(uid).updateData([
