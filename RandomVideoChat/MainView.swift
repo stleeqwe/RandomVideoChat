@@ -129,16 +129,19 @@ struct MainView: View {
                 VStack(spacing: 16) {
                     // 순차적으로 나타나는 상향 화살표
                     VStack(spacing: 6) {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
-                            .opacity(showSwipeHint ? 1.0 : 0.6)
-                            .scaleEffect(showSwipeHint ? 1.0 : 0.9)
-                            .animation(
-                                .easeInOut(duration: 1.2)
-                                    .repeatForever(autoreverses: true),
-                                value: showSwipeHint
-                            )
+                        ForEach(0..<3, id: \.self) { index in
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.white)
+                                .opacity(showSwipeHint ? 1.0 : 0.3)
+                                .scaleEffect(showSwipeHint ? 1.0 : 0.7)
+                                .animation(
+                                    .easeInOut(duration: 0.6)
+                                        .repeatForever(autoreverses: true)
+                                        .delay(Double(index) * 0.2),
+                                    value: showSwipeHint
+                                )
+                        }
                     }
                     .offset(y: swipeOffset)
                     
