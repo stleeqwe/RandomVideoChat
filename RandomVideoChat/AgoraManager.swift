@@ -321,20 +321,32 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         agoraKit?.muteAllRemoteVideoStreams(false)
         agoraKit?.muteAllRemoteAudioStreams(false)
         
-        // 채널에 이미 있는 사용자 확인을 위한 빠른 체크 (1초 후)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        // 빠른 체크 (0.5초 후) - 동시 입장 케이스 대응
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             if !self.remoteUserJoined {
-                print("⚠️ 1초 경과 - 원격 사용자 체크 시작")
+                print("⚠️ 0.5초 경과 - 원격 사용자 체크 시작")
                 self.checkRemoteUsersInChannel()
             }
         }
         
-        // 추가 체크 (3초 후)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+        // 추가 체크 (2초 후)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             guard let self = self else { return }
             if !self.remoteUserJoined {
-                print("⚠️ 3초 경과 후에도 원격 사용자 미참가 - 재확인")
+                print("⚠️ 2초 경과 - 원격 사용자 재체크")
+                self.checkRemoteUsersInChannel()
+                
+                // 강제로 원격 비디오 구독 재시도
+                self.forceSubscribeRemoteStreams()
+            }
+        }
+        
+        // 최종 체크 (4초 후)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+            guard let self = self else { return }
+            if !self.remoteUserJoined {
+                print("⚠️ 4초 경과 후에도 원격 사용자 미참가 - 연결 문제 가능성")
                 self.checkRemoteUsersInChannel()
             }
         }
@@ -357,6 +369,11 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         // 중복 처리 방지
         guard remoteUserId == 0 || remoteUserId != uid else {
             print("⚠️ 이미 처리된 원격 사용자: \(uid)")
+            // 이미 처리되었더라도 비디오가 표시되지 않는다면 재설정
+            if !remoteVideoEnabled {
+                print("   → 비디오 미활성화 상태, 재설정 시도")
+                setupRemoteUserVideo(uid: uid)
+            }
             return
         }
         
@@ -367,6 +384,12 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             guard let self = self else { return }
             
             print("🎬 원격 비디오 설정 시작...")
+            
+            // 기존 뷰가 있다면 제거
+            if let existingView = self.remoteVideoView {
+                existingView.removeFromSuperview()
+                self.remoteVideoView = nil
+            }
             
             // 새로운 뷰 생성
             let view = UIView()
@@ -387,8 +410,6 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             self.agoraKit?.muteRemoteVideoStream(uid, mute: false)
             self.agoraKit?.muteRemoteAudioStream(uid, mute: false)
             
-            // 원격 스트림 우선순위 설정 - API 제거 (deprecated)
-            
             // 원격 비디오 구독 활성화
             self.agoraKit?.setRemoteSubscribeFallbackOption(.audioOnly)
             
@@ -399,6 +420,15 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             print("✅ 원격 비디오 설정 완료: UID \(uid)")
             print("   - remoteUserJoined: \(self.remoteUserJoined)")
             print("   - remoteVideoEnabled: \(self.remoteVideoEnabled)")
+            
+            // 비디오 상태 확인을 위한 지연 체크
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self = self else { return }
+                if !self.remoteVideoEnabled {
+                    print("⚠️ 1초 후에도 원격 비디오 미활성화 - 재설정")
+                    self.setupRemoteUserVideo(uid: uid)
+                }
+            }
         }
     }
     
@@ -572,15 +602,21 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             
             // 원격 비디오 폴백 옵션 설정
             agoraKit?.setRemoteSubscribeFallbackOption(.audioOnly)
-            
-            // 다시 한번 체크 (5초 후)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-                guard let self = self else { return }
-                if !self.remoteUserJoined {
-                    print("⚠️ 5초 후에도 원격 사용자 미참가 - 연결 문제 가능성")
-                }
-            }
         }
+    }
+    
+    // 강제로 원격 스트림 구독
+    private func forceSubscribeRemoteStreams() {
+        print("🔄 강제 원격 스트림 구독 시도")
+        
+        // 모든 원격 비디오/오디오 스트림 구독
+        agoraKit?.muteAllRemoteVideoStreams(false)
+        agoraKit?.muteAllRemoteAudioStreams(false)
+        
+        // 폴백 옵션 설정
+        agoraKit?.setRemoteSubscribeFallbackOption(.audioOnly)
+        
+        print("✅ 원격 스트림 구독 설정 완료")
     }
     
     // MARK: - Performance Optimizations

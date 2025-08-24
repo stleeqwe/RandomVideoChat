@@ -602,41 +602,45 @@ struct VideoCallView: View {
             print("🔍 내 역할: \(isUser1 ? "user1" : "user2")")
             print("🔍 채널명: \(channelName)")
             
-            // 상대방 준비 상태를 먼저 확인
-            matchRef.child(otherReadyKey).observeSingleEvent(of: .value) { snapshot in
-                let otherReady = (snapshot.value as? Bool) ?? false
-                print("🔍 상대방 현재 준비 상태: \(otherReady)")
+            // 내 준비 상태를 먼저 설정
+            matchRef.child(myReadyKey).setValue(true) { error, _ in
+                if let error = error {
+                    print("❌ Ready 상태 설정 실패: \(error)")
+                    return
+                }
                 
-                // 내 준비 상태를 true로 설정
-                matchRef.child(myReadyKey).setValue(true) { error, _ in
-                    if let error = error {
-                        print("❌ Ready 상태 설정 실패: \(error)")
-                        return
-                    }
-                    
-                    print("✅ 내 준비 상태 설정 완료")
-                    
-                    if otherReady {
-                        // 상대방이 이미 준비됨 - 즉시 채널 참가
-                        print("✅ 상대방이 이미 준비됨 - 즉시 채널 참가")
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("✅ 내 준비 상태 설정 완료")
+                
+                // 상대방 준비 상태 관찰 (실시간)
+                let readyObserver = matchRef.child(otherReadyKey).observe(.value) { snapshot in
+                    if let isReady = snapshot.value as? Bool, isReady {
+                        print("✅ 상대방도 준비 완료 감지")
+                        
+                        // 리스너 즉시 제거
+                        matchRef.child(otherReadyKey).removeAllObservers()
+                        
+                        // 두 사용자가 동시에 입장하도록 동일한 지연 적용
+                        // 양쪽 모두 준비되었음을 확인한 후 0.3초 후 동시 입장
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            print("🎬 채널 입장 시작: \(channelName)")
                             self.agoraManager.startCall(channel: channelName)
                         }
-                    } else {
-                        // 상대방 준비 상태 실시간 관찰
-                        matchRef.child(otherReadyKey).observe(.value) { snapshot in
-                            if let isReady = snapshot.value as? Bool, isReady {
-                                print("✅ 상대방도 준비 완료 - 채널 참가")
-                                
-                                // 두 사용자가 거의 동시에 참가하도록 약간의 지연 추가
-                                let delay = isUser1 ? 0.2 : 0.4  // user1이 약간 먼저 참가
-                                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                                    self.agoraManager.startCall(channel: channelName)
-                                }
-                                
-                                // 리스너 제거
-                                matchRef.child(otherReadyKey).removeAllObservers()
-                            }
+                    }
+                }
+                
+                // 자신의 ready 상태 설정 직후 상대방 상태 한번 체크
+                // (상대방이 이미 ready인 경우를 위해)
+                matchRef.child(otherReadyKey).observeSingleEvent(of: .value) { snapshot in
+                    if let isReady = snapshot.value as? Bool, isReady {
+                        print("✅ 상대방이 이미 준비되어 있음")
+                        
+                        // 리스너 제거
+                        matchRef.child(otherReadyKey).removeAllObservers()
+                        
+                        // 동일한 지연으로 입장
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            print("🎬 채널 입장 시작: \(channelName)")
+                            self.agoraManager.startCall(channel: channelName)
                         }
                     }
                 }
