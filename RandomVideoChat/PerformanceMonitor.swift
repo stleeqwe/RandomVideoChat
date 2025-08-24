@@ -8,6 +8,7 @@ import FirebasePerformance
 class PerformanceMonitor {
     static let shared = PerformanceMonitor()
     private let logger = Logger(subsystem: "com.5sec.app", category: "Performance")
+    private var perfTimer: Timer?
     
     private init() {}
     
@@ -110,9 +111,15 @@ class PerformanceMonitor {
     
     // MARK: - Automatic Performance Monitoring
     func startPerformanceMonitoring() {
-        Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        perfTimer?.invalidate()
+        perfTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             self?.logCurrentMetrics()
         }
+    }
+
+    func stopPerformanceMonitoring() {
+        perfTimer?.invalidate()
+        perfTimer = nil
     }
 }
 

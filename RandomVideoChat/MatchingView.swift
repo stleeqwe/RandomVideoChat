@@ -4,7 +4,7 @@ import FirebaseAuth
 @available(iOS 15.0, *)
 struct MatchingView: View {
     @Binding var isPresented: Bool
-    @StateObject private var matchingManager = MatchingManager.shared
+    @EnvironmentObject var matchingManager: MatchingManager
     @State private var dotCount = 0
     @State private var pulseAnimation = false
     @State private var navigateToVideoCall = false

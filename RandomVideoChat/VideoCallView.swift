@@ -13,11 +13,11 @@ struct VideoCallView: View {
     @State private var isTimerStarted = false
     @State private var timer: Timer?
     @State private var isMuted = false
-    @State private var heartCount = 3
+    @AppStorage("heartCount") private var heartCount: Int = 3
     @State private var isCallEnding = false
     @State private var opponentUserId: String = ""
     @State private var showHeartAnimation = false
-    @State private var isCameraOn = true
+    @AppStorage("isCameraOn") private var isCameraOn: Bool = true
     @State private var heartCountAnimation = false
     
     // 신고/차단 관련 상태
@@ -35,7 +35,8 @@ struct VideoCallView: View {
     @State private var backgroundStartTime: Date?
 
     @StateObject private var userManager = UserManager.shared
-    @StateObject private var agoraManager = AgoraManager.shared
+    @EnvironmentObject var agoraManager: AgoraManager
+    @EnvironmentObject var matchingManager: MatchingManager
 
     @Environment(\.presentationMode) var presentationMode
 
@@ -136,10 +137,8 @@ struct VideoCallView: View {
                             // 카메라 아이콘
                             Button(action: {
                                 // 실제 비디오 스트림 제어
-                                let isCameraOff = AgoraManager.shared.toggleCamera()
+                                let isCameraOff = agoraManager.toggleCamera()
                                 isCameraOn = !isCameraOff
-                                // 카메라 상태를 UserDefaults에 저장
-                                UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
                             }) {
                                 Image(systemName: isCameraOn ? "camera.fill" : "camera")
                                     .font(.system(size: 28))
@@ -218,7 +217,7 @@ struct VideoCallView: View {
                             
                             // 2) 타이머 +60초
                             timeRemaining += 60
-                            MatchingManager.shared.updateCallTimer(timeRemaining)
+                            matchingManager.updateCallTimer(timeRemaining)
                             
                             // 3) 서버에 원자적으로 하트 감소 (FieldValue.increment 사용)
                             userManager.changeHeartCount(uid: uid, delta: -1)
@@ -370,10 +369,10 @@ struct VideoCallView: View {
         timer?.invalidate()
         
         // Agora 연결 종료
-        AgoraManager.shared.endCall()
+        agoraManager.endCall()
         
         // Firebase 리스너 정리
-        MatchingManager.shared.cleanupCallObservers()
+        matchingManager.cleanupCallObservers()
         cleanupCallSyncObservers()
         
         // Firestore heartCount 리스너 해제
@@ -383,6 +382,7 @@ struct VideoCallView: View {
         // UserDefaults 정리
         UserDefaults.standard.removeObject(forKey: "currentChannelName")
         UserDefaults.standard.removeObject(forKey: "currentMatchId")
+        PerformanceMonitor.shared.stopPerformanceMonitoring()
     }
     
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
@@ -447,7 +447,6 @@ struct VideoCallView: View {
                     if newHeartCount != heartCount {
                         DispatchQueue.main.async {
                             heartCount = newHeartCount
-                            UserDefaults.standard.set(newHeartCount, forKey: "heartCount")
                         }
                     }
                 }
@@ -584,7 +583,7 @@ struct VideoCallView: View {
     func startVideoCall() {
         isCallActive = true
         if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {
-            AgoraManager.shared.startCall(channel: channelName)
+            agoraManager.startCall(channel: channelName)
         }
         // 통화 시작 시 통화 횟수 증가 및 선호도 갱신
         UserManager.shared.incrementCallCount()
@@ -608,11 +607,11 @@ struct VideoCallView: View {
     }
 
     func toggleMute() {
-        isMuted = AgoraManager.shared.toggleMute()
+        isMuted = agoraManager.toggleMute()
     }
 
     func switchCamera() {
-        AgoraManager.shared.switchCamera()
+        agoraManager.switchCamera()
     }
     
     // MARK: - Enhanced Report and Block Functions

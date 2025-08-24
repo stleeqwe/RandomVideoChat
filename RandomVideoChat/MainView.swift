@@ -4,8 +4,8 @@ import AVFoundation
 
 @available(iOS 15.0, *)
 struct MainView: View {
-    @State private var isCameraOn = true
-    @State private var heartCount = 3  // 기본 하트 개수
+    @AppStorage("isCameraOn") private var isCameraOn: Bool = true
+    @AppStorage("heartCount") private var heartCount: Int = 3  // 기본 하트 개수
     @State private var showMatchingView = false
     @StateObject private var userManager = UserManager.shared
     @State private var permissionsGranted = false
@@ -106,8 +106,6 @@ struct MainView: View {
                     VStack(spacing: 12) {
                         Button(action: {
                             isCameraOn.toggle()
-                            // 카메라 상태를 UserDefaults에 저장
-                            UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
                         }) {
                             Image(systemName: isCameraOn ? "camera.fill" : "camera")
                                 .font(.system(size: 28))
@@ -131,19 +129,16 @@ struct MainView: View {
                 VStack(spacing: 16) {
                     // 순차적으로 나타나는 상향 화살표
                     VStack(spacing: 6) {
-                        ForEach(0..<3, id: \.self) { index in
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(.white)
-                                .opacity(showSwipeHint ? 1.0 : 0.3)
-                                .scaleEffect(showSwipeHint ? 1.0 : 0.7)
-                                .animation(
-                                    .easeInOut(duration: 0.6)
-                                        .repeatForever(autoreverses: true)
-                                        .delay(Double(index) * 0.2),
-                                    value: showSwipeHint
-                                )
-                        }
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                            .opacity(showSwipeHint ? 1.0 : 0.6)
+                            .scaleEffect(showSwipeHint ? 1.0 : 0.9)
+                            .animation(
+                                .easeInOut(duration: 1.2)
+                                    .repeatForever(autoreverses: true),
+                                value: showSwipeHint
+                            )
                     }
                     .offset(y: swipeOffset)
                     
@@ -214,6 +209,8 @@ struct MainView: View {
                         // 성별 선택 확인
                         if userManager.currentUser?.gender != nil {
                             print("✅ 모든 조건 충족 - 매칭 화면 표시")
+                            // 카메라 세션 정리 후 전환 (Agora 충돌 방지)
+                            CameraSessionManager.shared.stop()
                             showMatchingView = true
                         } else {
                             print("❌ 성별 선택 필요 - 알림 표시")
@@ -240,27 +237,18 @@ struct MainView: View {
             }
         }
         .onAppear {
-            // 저장된 카메라 상태 복원
-            isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
-            // 기본값이 false이므로 한번도 설정하지 않았다면 true로 설정
-            if UserDefaults.standard.object(forKey: "isCameraOn") == nil {
-                isCameraOn = true
-                UserDefaults.standard.set(true, forKey: "isCameraOn")
-            }
-            
-            // 권한 요청
-            checkPermissions()
-            
             // 로컬 상태를 UserManager의 현재 값으로 초기화
             myGender = userManager.currentUser?.gender
             preferredGender = userManager.currentUser?.preferredGender
-            requestPermissions()
-            
+
             // 현재 사용자 데이터 로드
             if let uid = Auth.auth().currentUser?.uid {
                 userManager.loadCurrentUser(uid: uid)
             }
-            
+
+            // 권한 요청 (중복 방지)
+            requestCameraAndMicrophonePermissions()
+
             // 일일 출석 보상 체크
             DailyRewardManager.shared.checkAndGrantDailyReward { granted, message in
                 if granted, let message = message {
@@ -280,15 +268,13 @@ struct MainView: View {
             // Firestore에서 가져온 값 우선 사용
             if let user = user {
                 heartCount = user.heartCount
-                UserDefaults.standard.set(heartCount, forKey: "heartCount")
                 
                 // 로컬 성별 상태도 동기화
                 myGender = user.gender
                 preferredGender = user.preferredGender
             } else {
-                // Firestore에 데이터가 없으면 UserDefaults 확인
-                let saved = UserDefaults.standard.integer(forKey: "heartCount")
-                heartCount = saved > 0 ? saved : 3
+                // Firestore에 데이터가 없으면 기본값 사용
+                heartCount = 3
             }
         }
         // 🆕 중요: fullScreenCover 추가!!!
@@ -300,46 +286,78 @@ struct MainView: View {
         }
     }
     
-    func checkPermissions() {
-        let cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
-        let micStatus    = AVCaptureDevice.authorizationStatus(for: .audio)
-
-        // 카메라 권한 처리
-        switch cameraStatus {
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                DispatchQueue.main.async {
-                    if granted {
-                        self.checkPermissions()
-                    } else {
-                        self.permissionMessage = "카메라 권한이 필요합니다. 설정에서 권한을 허용해주세요."
-                        self.showPermissionAlert = true
-                    }
-                }
+    // MARK: - Unified permission flow
+    func requestCameraAndMicrophonePermissions() {
+        func status(_ mediaType: AVMediaType) -> AVAuthorizationStatus {
+            AVCaptureDevice.authorizationStatus(for: mediaType)
+        }
+        func request(_ mediaType: AVMediaType, _ completion: @escaping (Bool) -> Void) {
+            AVCaptureDevice.requestAccess(for: mediaType) { granted in
+                completion(granted)
             }
-        case .denied, .restricted:
-            self.permissionMessage = "카메라 권한이 필요합니다. 설정에서 권한을 허용해주세요."
-            self.showPermissionAlert = true
-        default:
-            break
         }
 
-        // 마이크 권한 처리
-        switch micStatus {
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { granted in
-                DispatchQueue.main.async {
-                    if !granted {
-                        self.permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요."
-                        self.showPermissionAlert = true
+        let videoStatus = status(.video)
+        let audioStatus = status(.audio)
+
+        if videoStatus == .authorized && audioStatus == .authorized {
+            permissionsGranted = true
+            return
+        }
+
+        // Request missing permissions sequentially to avoid duplicate prompts
+        if videoStatus == .notDetermined {
+            request(.video) { granted in
+                if !granted {
+                    DispatchQueue.main.async {
+                        permissionMessage = "카메라 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
+                        showPermissionAlert = true
+                    }
+                    return
+                }
+                // After camera, request mic if needed
+                let micStatus = status(.audio)
+                if micStatus == .notDetermined {
+                    request(.audio) { micGranted in
+                        DispatchQueue.main.async {
+                            self.permissionsGranted = micGranted
+                            if !micGranted {
+                                permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
+                                showPermissionAlert = true
+                            }
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.permissionsGranted = (micStatus == .authorized)
+                        if micStatus != .authorized {
+                            permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
+                            showPermissionAlert = true
+                        }
                     }
                 }
             }
-        case .denied, .restricted:
-            self.permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요."
-            self.showPermissionAlert = true
-        default:
-            break
+        } else {
+            // Camera already determined; handle mic
+            if audioStatus == .notDetermined {
+                request(.audio) { micGranted in
+                    DispatchQueue.main.async {
+                        self.permissionsGranted = (videoStatus == .authorized) && micGranted
+                        if !micGranted {
+                            permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
+                            showPermissionAlert = true
+                        }
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.permissionsGranted = (videoStatus == .authorized) && (audioStatus == .authorized)
+                    if !self.permissionsGranted {
+                        permissionMessage = "카메라/마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
+                        showPermissionAlert = true
+                    }
+                }
+            }
         }
     }
     
@@ -347,27 +365,6 @@ struct MainView: View {
         guard let url = URL(string: UIApplication.openSettingsURLString),
               UIApplication.shared.canOpenURL(url) else { return }
         UIApplication.shared.open(url)
-    }
-
-    
-    func requestPermissions() {
-        // 카메라 권한
-        AVCaptureDevice.requestAccess(for: .video) { granted in
-            print("📷 카메라 권한: \(granted)")
-            if granted {
-                checkMicrophonePermission()
-            }
-        }
-    }
-    
-    func checkMicrophonePermission() {
-        // 마이크 권한
-        AVCaptureDevice.requestAccess(for: .audio) { granted in
-            print("🎤 마이크 권한: \(granted)")
-            DispatchQueue.main.async {
-                self.permissionsGranted = granted
-            }
-        }
     }
 }
 

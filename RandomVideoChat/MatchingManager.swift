@@ -234,9 +234,8 @@ class MatchingManager: ObservableObject {
         
         // 1. 내 상태 변화 관찰 (매칭 성공 감지용)
         observeMyStatus(userId: currentUserId)
-        
-        // 2. 새로운 버킷 기반 매칭 시도 (단발성)
-        findWaitingUsers(currentUserId: currentUserId)
+        // 2. 클라이언트 폴링 제거: Cloud Function이 매칭을 수행하고
+        //    상태를 업데이트하므로 여기서 주기적 검색을 수행하지 않습니다.
     }
     
     private func observeMyStatus(userId: String) {

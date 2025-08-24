@@ -4,6 +4,18 @@ import AVFoundation
 struct CameraView: UIViewRepresentable {
     @Binding var isFrontCamera: Bool
     
+    // Global session manager to allow stopping from outside view
+    class CameraSessionManager {
+        static let shared = CameraSessionManager()
+        weak var session: AVCaptureSession?
+        func stop() {
+            if let session = session, session.isRunning {
+                session.stopRunning()
+                print("📷 Camera session stopped")
+            }
+        }
+    }
+
     class Coordinator: NSObject {
         var parent: CameraView
         var captureSession: AVCaptureSession?
@@ -17,7 +29,8 @@ struct CameraView: UIViewRepresentable {
         func setupCamera() {
             print("📷 카메라 설정 시작...")
             captureSession = AVCaptureSession()
-            captureSession?.sessionPreset = .high
+            captureSession?.sessionPreset = .medium
+            CameraSessionManager.shared.session = captureSession
             
             // 전면 카메라 찾기
             if let camera = AVCaptureDevice.default(.builtInWideAngleCamera,
@@ -188,6 +201,14 @@ struct CameraPreview: View {
                             .foregroundColor(.gray)
                     )
             }
+        }
+        .onChange(of: isOn) { newValue in
+            if newValue == false {
+                CameraSessionManager.shared.stop()
+            }
+        }
+        .onDisappear {
+            CameraSessionManager.shared.stop()
         }
     }
 }

@@ -1,6 +1,9 @@
 import SwiftUI
 import AgoraRtcKit
 import AVFoundation
+#if canImport(FirebaseFunctions)
+import FirebaseFunctions
+#endif
 
 class AgoraManager: NSObject, ObservableObject {
     static let shared = AgoraManager()
@@ -14,6 +17,9 @@ class AgoraManager: NSObject, ObservableObject {
         return appId
     }()
     private var agoraKit: AgoraRtcEngineKit?
+    #if canImport(FirebaseFunctions)
+    private lazy var functions = Functions.functions()
+    #endif
     
     // 상태 관리
     @Published var isInCall = false
@@ -166,12 +172,7 @@ class AgoraManager: NSObject, ObservableObject {
         
         self.channelName = channel
         
-        #if DEBUG
-        print("🎯 joinChannel 호출 전")
-        print("🔑 토큰: nil (토큰 없이 연결)")
-        #endif
-        
-        // 🆕 수정: 옵션을 더 명확하게 설정
+        // 미디어 옵션 설정
         let options = AgoraRtcChannelMediaOptions()
         options.publishCameraTrack = true
         options.publishMicrophoneTrack = true
@@ -180,40 +181,39 @@ class AgoraManager: NSObject, ObservableObject {
         options.autoSubscribeAudio = true
         options.channelProfile = .communication  // 🆕 1:1 통화 명시
         
-        // 채널 참가
-        // TODO: 프로덕션 배포 시 보안 개선 필요
-        // - 서버에서 동적 토큰 발급 구현
-        // - 토큰 만료 시간 관리 (24시간 권장)
-        // - 토큰 갱신 로직 추가
-        let result = engine.joinChannel(
-            byToken: nil,  // 현재는 테스트 모드 (프로덕션에서는 서버 발급 토큰 사용)
-            channelId: channel,
-            uid: 0,  // 0은 Agora가 자동으로 UID 할당
-            mediaOptions: options
-        ) { [weak self] channel, uid, elapsed in
-            #if DEBUG
-            print("✅ joinChannel 콜백 호출됨!")
-            print("✅ 채널 참가 성공: \(channel), uid: \(uid), elapsed: \(elapsed)ms")
-            #endif
-            self?.localUserId = uid
-            DispatchQueue.main.async {
-                self?.isInCall = true
+        // 토큰 요청 후 채널 참가
+        fetchAgoraToken(for: channel) { [weak self] token in
+            guard let self = self else { return }
+            let result = engine.joinChannel(
+                byToken: token,
+                channelId: channel,
+                uid: 0,
+                mediaOptions: options
+            ) { [weak self] channel, uid, elapsed in
+                #if DEBUG
+                print("✅ joinChannel 콜백 호출됨!")
+                print("✅ 채널 참가 성공: \(channel), uid: \(uid), elapsed: \(elapsed)ms")
+                #endif
+                self?.localUserId = uid
+                DispatchQueue.main.async {
+                    self?.isInCall = true
+                }
             }
-        }
-        
-        #if DEBUG
-        print("🎯 joinChannel 호출 결과: \(result)")
-        #endif
-        
-        if result != 0 {
+            
             #if DEBUG
-            print("❌ joinChannel 실패: \(result)")
+            print("🎯 joinChannel 호출 결과: \(result)")
             #endif
-            handleJoinError(result)
-        } else {
-            #if DEBUG
-            print("✅ joinChannel 호출 성공 (결과: 0)")
-            #endif
+            
+            if result != 0 {
+                #if DEBUG
+                print("❌ joinChannel 실패: \(result)")
+                #endif
+                self.handleJoinError(result)
+            } else {
+                #if DEBUG
+                print("✅ joinChannel 호출 성공 (결과: 0)")
+                #endif
+            }
         }
     }
     
@@ -339,8 +339,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
         // 강제 종료나 네트워크 문제로 인한 종료인지 확인
         if reason == .dropped {
-            // MatchingManager에 통화 종료 신호 전송
-            MatchingManager.shared.signalCallEnd()
+            print("🚨 상대방 연결 끊김 (dropped)")
         }
         
         DispatchQueue.main.async {
@@ -386,6 +385,29 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         #if DEBUG
         print("⚠️ Agora 경고: \(warningCode.rawValue)")
         #endif
+    }
+
+    // 네트워크 품질 콜백
+    func rtcEngine(_ engine: AgoraRtcEngineKit, networkQuality uid: UInt, txQuality: AgoraNetworkQuality, rxQuality: AgoraNetworkQuality) {
+        let overall = min(txQuality.rawValue, rxQuality.rawValue)
+        if overall >= AgoraNetworkQuality.bad.rawValue {
+            print("⚠️ 네트워크 품질 저하 (tx=\(txQuality.rawValue), rx=\(rxQuality.rawValue)) - 화질 조정")
+            adaptVideoQualityToNetwork()
+        }
+    }
+
+    func rtcEngineConnectionDidLost(_ engine: AgoraRtcEngineKit) {
+        print("🚨 연결 손실 - 재연결 시도 중...")
+    }
+
+    func rtcEngine(_ engine: AgoraRtcEngineKit, tokenPrivilegeWillExpire token: String) {
+        print("⏳ 토큰 만료 예정 - 갱신 요청")
+        if !channelName.isEmpty {
+            fetchAgoraToken(for: channelName) { [weak self] newToken in
+                guard let newToken = newToken else { return }
+                self?.agoraKit?.renewToken(newToken)
+            }
+        }
     }
     
     // 원격 사용자의 비디오 상태 변경
@@ -482,6 +504,27 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     // 네트워크 상태 변화에 따른 동적 품질 조정
     func adaptVideoQualityToNetwork() {
         setupAdaptiveVideoConfig()
+    }
+    
+    // MARK: - Token Handling
+    private func fetchAgoraToken(for channel: String, completion: @escaping (String?) -> Void) {
+        #if canImport(FirebaseFunctions)
+        functions.httpsCallable("generateAgoraToken").call(["channelName": channel]) { result, error in
+            if let error = error {
+                print("⚠️ 토큰 요청 실패: \(error.localizedDescription). 토큰 없이 시도합니다 (DEBUG).")
+                completion(nil)
+                return
+            }
+            if let dict = result?.data as? [String: Any], let token = dict["token"] as? String {
+                completion(token)
+            } else {
+                print("⚠️ 토큰 응답 파싱 실패. 토큰 없이 시도합니다 (DEBUG).")
+                completion(nil)
+            }
+        }
+        #else
+        completion(nil)
+        #endif
     }
     
     // 성능 메트릭 수집
