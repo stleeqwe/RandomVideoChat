@@ -212,8 +212,8 @@ struct MainView: View {
                         // 성별 선택 확인
                         if userManager.currentUser?.gender != nil {
                             print("✅ 모든 조건 충족 - 매칭 화면 표시")
-                            // 카메라 세션 정리 후 전환 (Agora 충돌 방지)
-                            CameraSessionManager.shared.stop()
+                            // 매칭 화면 진입 시에는 카메라 세션을 유지합니다.
+                            // 실제 통화 화면(VideoCallView) 진입 시에만 세션을 중지하여 버벅임을 방지합니다.
                             showMatchingView = true
                         } else {
                             print("❌ 성별 선택 필요 - 알림 표시")
@@ -281,7 +281,12 @@ struct MainView: View {
             }
         }
         // 🆕 중요: fullScreenCover 추가!!!
-        .fullScreenCover(isPresented: $showMatchingView) {
+        .fullScreenCover(isPresented: $showMatchingView, onDismiss: {
+            // 매칭 화면 종료 시 카메라 미리보기 재시작
+            if isCameraOn {
+                CameraView.CameraSessionManager.shared.ensureRunning()
+            }
+        }) {
             MatchingView(isPresented: $showMatchingView)
         }
         .sheet(isPresented: $showSettings) {

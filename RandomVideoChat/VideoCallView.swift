@@ -271,6 +271,8 @@ struct VideoCallView: View {
 
         }
         .onAppear {
+            // Agora 사용 전 커스텀 카메라 세션 중지 (충돌 방지)
+            CameraView.CameraSessionManager.shared.stop()
             setupVideoCall()
         }
         .onChange(of: agoraManager.remoteUserJoined) { joined in

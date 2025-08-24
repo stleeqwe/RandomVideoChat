@@ -14,6 +14,14 @@ struct CameraView: UIViewRepresentable {
                 print("📷 Camera session stopped")
             }
         }
+        func ensureRunning() {
+            if let session = session, !session.isRunning {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    session.startRunning()
+                    print("📷 Camera session restarted")
+                }
+            }
+        }
     }
 
     class Coordinator: NSObject {
@@ -204,11 +212,11 @@ struct CameraPreview: View {
         }
         .onChange(of: isOn) { newValue in
             if newValue == false {
-                CameraSessionManager.shared.stop()
+                CameraView.CameraSessionManager.shared.stop()
             }
         }
         .onDisappear {
-            CameraSessionManager.shared.stop()
+            CameraView.CameraSessionManager.shared.stop()
         }
     }
 }
