@@ -513,39 +513,65 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         print("📹 원격 비디오 상태 변경: UID \(uid), 상태: \(state.rawValue), 이유: \(reason.rawValue)")
         #endif
         
+        // 자기 자신의 UID가 아닌지 확인
+        guard uid != localUserId else {
+            print("⚠️ 자신의 비디오 상태 변경 무시")
+            return
+        }
+        
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
             switch state {
-            case .stopped, .frozen:
+            case .stopped:
                 self.remoteVideoEnabled = false
                 #if DEBUG
-                print("   ➜ 원격 비디오 비활성화")
+                print("   ➜ 원격 비디오 정지")
                 #endif
+                // 스트림 재구독 시도
+                self.forceSubscribeRemoteStreams()
+                
+            case .frozen:
+                #if DEBUG
+                print("   ➜ 원격 비디오 멈춤 - 네트워크 문제")
+                #endif
+                // frozen 상태에서는 비디오를 비활성화하지 않고 대기
                 
             case .starting:
-                // 비디오가 시작되면 원격 사용자 설정 재시도
-                if self.remoteVideoView == nil && uid != 0 {
-                    print("   ➜ 원격 비디오 시작 - 설정 재시도")
+                print("   ➜ 원격 비디오 시작 - 설정 시도")
+                // 원격 사용자 설정
+                if self.remoteUserId != uid || self.remoteVideoView == nil {
                     self.setupRemoteUserVideo(uid: uid)
                 }
                 self.remoteVideoEnabled = true
                 
             case .decoding:
-                self.remoteVideoEnabled = true
                 #if DEBUG
-                print("   ➜ 원격 비디오 활성화")
+                print("   ➜ 원격 비디오 디코딩 중 (정상)")
                 #endif
                 
+                // 비디오뷰가 없으면 재설정
+                if self.remoteVideoView == nil {
+                    print("   ➜ 비디오뷰 없음 - 재설정")
+                    self.setupRemoteUserVideo(uid: uid)
+                }
+                
+                self.remoteVideoEnabled = true
+                // UI 업데이트 강제
+                self.objectWillChange.send()
+                
             case .failed:
-                self.remoteVideoEnabled = false
                 #if DEBUG
-                print("   ➜ 원격 비디오 실패 - 재시도")
+                print("   ➜ 원격 비디오 실패")
                 #endif
-                // 실패 시 재시도
+                
+                self.remoteVideoEnabled = false
+                
+                // 실패 시 재시도 및 스트림 재구독
                 if uid != 0 {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                         self?.setupRemoteUserVideo(uid: uid)
+                        self?.forceSubscribeRemoteStreams()
                     }
                 }
                 

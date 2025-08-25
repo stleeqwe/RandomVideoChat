@@ -654,7 +654,7 @@ class MatchingManager: ObservableObject {
         
         print("🚀 매칭 확정 진행 시작 [tier=\(prefTier ?? "unknown")] opponent=\(opponentId)")
         
-        // 1) 매칭 확정(멀티 로케이션 업데이트) - ready 상태 추가
+        // 1) 매칭 확정(멀티 로케이션 업데이트) - ready 상태와 callStartAt 초기화
         let updates: [String: Any] = [
             "matches/\(matchId)/status": "active",
             "matches/\(matchId)/user1": currentUserId,
@@ -663,6 +663,7 @@ class MatchingManager: ObservableObject {
             "matches/\(matchId)/timestamp": ServerValue.timestamp(),
             "matches/\(matchId)/user1Ready": false,
             "matches/\(matchId)/user2Ready": false,
+            "matches/\(matchId)/callStartAt": NSNull(),  // callStartAt 명시적 초기화
             "matching_queue/\(currentUserId)/status": "matched",
             "matching_queue/\(currentUserId)/matchId": matchId,
             "matching_queue/\(currentUserId)/channelName": channelName,

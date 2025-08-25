@@ -342,23 +342,46 @@ struct VideoCallView: View {
         print("📱 통화 종료 - 백그라운드 관련 상태 모두 초기화")
         #endif
         
-        if signalEnd {
-            // 내가 종료하는 경우에만 통화 종료 신호 전송 (matchId 삭제 전에 실행)
-            if let matchId = UserDefaults.standard.string(forKey: "currentMatchId") {
+        // DB에서 ready 상태 및 callStartAt 정리
+        if let matchId = UserDefaults.standard.string(forKey: "currentMatchId"),
+           let currentUserId = Auth.auth().currentUser?.uid {
+            
+            let matchRef = Database.database().reference().child("matches").child(matchId)
+            
+            // 매치 정보에서 내가 user1인지 user2인지 확인
+            matchRef.observeSingleEvent(of: .value) { snapshot in
+                if let data = snapshot.value as? [String: Any],
+                   let user1 = data["user1"] as? String {
+                    
+                    let isUser1 = (user1 == currentUserId)
+                    let myReadyKey = isUser1 ? "user1Ready" : "user2Ready"
+                    
+                    // ready 상태와 callStartAt 초기화
+                    let cleanupUpdates: [String: Any] = [
+                        myReadyKey: false,
+                        "callStartAt": NSNull()
+                    ]
+                    
+                    matchRef.updateChildValues(cleanupUpdates) { error, _ in
+                        if let error = error {
+                            print("❌ DB 상태 정리 실패: \(error)")
+                        } else {
+                            print("✅ DB 상태 정리 완료 (ready: false, callStartAt: null)")
+                        }
+                    }
+                }
+            }
+            
+            if signalEnd {
+                // 내가 종료하는 경우 통화 종료 신호 전송
                 MatchingManager.shared.signalCallEnd(matchId: matchId)
                 #if DEBUG
-                print("📡 통화 종료 신호 전송 시도: matchId = \(matchId)")
+                print("📡 통화 종료 신호 전송: matchId = \(matchId)")
                 #endif
-            } else {
-                #if DEBUG
-                print("❌ 통화 종료 신호 전송 실패: matchId가 없음")
-                #endif
-                // matchId가 없어도 일단 기본 함수 시도
-                MatchingManager.shared.signalCallEnd()
             }
         }
         
-        // 매칭 상태를 항상 초기화 (signalEnd 후에 실행하여 matchId 삭제)
+        // 매칭 상태를 항상 초기화
         MatchingManager.shared.cancelMatching()
         
         if !signalEnd {
@@ -583,14 +606,13 @@ struct VideoCallView: View {
             return
         }
         
-        // Ready 상태를 설정하고 상대방 대기
         let matchRef = Database.database().reference().child("matches").child(matchId)
         
-        // 자신이 user1인지 user2인지 확인
+        // 매치 정보 읽기
         matchRef.observeSingleEvent(of: .value) { snapshot in
             guard let data = snapshot.value as? [String: Any],
                   let user1 = data["user1"] as? String,
-                  let user2 = data["user2"] as? String else {
+                  let _ = data["user2"] as? String else {
                 print("❌ 매치 정보 읽기 실패")
                 return
             }
@@ -602,7 +624,14 @@ struct VideoCallView: View {
             print("🔍 내 역할: \(isUser1 ? "user1" : "user2")")
             print("🔍 채널명: \(channelName)")
             
-            // 내 준비 상태를 먼저 설정
+            // 기존 ready 상태 및 callStartAt 초기화 (현재 사용하지 않음)
+            // let updates: [String: Any] = [
+            //     myReadyKey: true,
+            //     "user1Ready": isUser1 ? true : NSNull(),
+            //     "user2Ready": isUser1 ? NSNull() : true
+            // ]
+            
+            // 내 준비 상태 설정
             matchRef.child(myReadyKey).setValue(true) { error, _ in
                 if let error = error {
                     print("❌ Ready 상태 설정 실패: \(error)")
@@ -611,43 +640,74 @@ struct VideoCallView: View {
                 
                 print("✅ 내 준비 상태 설정 완료")
                 
-                // 상대방 준비 상태 관찰 (실시간)
-                let readyObserver = matchRef.child(otherReadyKey).observe(.value) { snapshot in
-                    if let isReady = snapshot.value as? Bool, isReady {
-                        print("✅ 상대방도 준비 완료 감지")
+                // callStartAt 관찰 시작
+                var callStartObserver: DatabaseHandle?
+                callStartObserver = matchRef.child("callStartAt").observe(.value) { snapshot in
+                    if let startTime = snapshot.value as? TimeInterval {
+                        print("🕐 통화 시작 시간 감지: \(startTime)")
                         
-                        // 리스너 즉시 제거
+                        // 리스너 제거
+                        if let handle = callStartObserver {
+                            matchRef.child("callStartAt").removeObserver(withHandle: handle)
+                        }
                         matchRef.child(otherReadyKey).removeAllObservers()
                         
-                        // 두 사용자가 동시에 입장하도록 동일한 지연 적용
-                        // 양쪽 모두 준비되었음을 확인한 후 0.3초 후 동시 입장
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        // 지정된 시간까지 대기
+                        let currentTime = Date().timeIntervalSince1970 * 1000
+                        let delay = max(0, (startTime - currentTime) / 1000)
+                        
+                        print("⏱ \(delay)초 후 채널 입장 예정")
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                             print("🎬 채널 입장 시작: \(channelName)")
                             self.agoraManager.startCall(channel: channelName)
                         }
                     }
                 }
                 
-                // 자신의 ready 상태 설정 직후 상대방 상태 한번 체크
-                // (상대방이 이미 ready인 경우를 위해)
+                // 상대방 준비 상태 체크
+                var otherReadyObserver: DatabaseHandle?
+                otherReadyObserver = matchRef.child(otherReadyKey).observe(.value) { snapshot in
+                    if let isReady = snapshot.value as? Bool, isReady {
+                        print("✅ 상대방도 준비 완료 - 시작 시간 설정")
+                        
+                        // 리스너 제거
+                        if let handle = otherReadyObserver {
+                            matchRef.child(otherReadyKey).removeObserver(withHandle: handle)
+                        }
+                        
+                        // callStartAt이 아직 설정되지 않았다면 설정
+                        matchRef.child("callStartAt").observeSingleEvent(of: .value) { snapshot in
+                            if snapshot.value == nil || snapshot.value is NSNull {
+                                // 현재 시간 + 2초 후로 설정 (밀리초 단위)
+                                let startTime = (Date().timeIntervalSince1970 + 2) * 1000
+                                
+                                print("📝 통화 시작 시간 설정: \(startTime)")
+                                matchRef.child("callStartAt").setValue(startTime)
+                            }
+                        }
+                    }
+                }
+                
+                // 상대방이 이미 준비되었는지 즉시 확인
                 matchRef.child(otherReadyKey).observeSingleEvent(of: .value) { snapshot in
                     if let isReady = snapshot.value as? Bool, isReady {
                         print("✅ 상대방이 이미 준비되어 있음")
                         
-                        // 리스너 제거
-                        matchRef.child(otherReadyKey).removeAllObservers()
-                        
-                        // 동일한 지연으로 입장
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            print("🎬 채널 입장 시작: \(channelName)")
-                            self.agoraManager.startCall(channel: channelName)
+                        // callStartAt 확인 및 설정
+                        matchRef.child("callStartAt").observeSingleEvent(of: .value) { snapshot in
+                            if snapshot.value == nil || snapshot.value is NSNull {
+                                let startTime = (Date().timeIntervalSince1970 + 2) * 1000
+                                print("📝 통화 시작 시간 설정: \(startTime)")
+                                matchRef.child("callStartAt").setValue(startTime)
+                            }
                         }
                     }
                 }
             }
         }
         
-        // 통화 시작 시 통화 횟수 증가 및 선호도 갱신
+        // 통화 시작 시 통화 횟수 증가
         UserManager.shared.incrementCallCount()
     }
 
