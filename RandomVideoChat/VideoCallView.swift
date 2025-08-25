@@ -13,20 +13,17 @@ struct VideoCallView: View {
     @State private var isTimerStarted = false
     @State private var timer: Timer?
     @State private var isMuted = false
-    @AppStorage("heartCount") private var heartCount: Int = 3
+    @State private var heartCount = 3
     @State private var isCallEnding = false
     @State private var opponentUserId: String = ""
     @State private var showHeartAnimation = false
-    @AppStorage("isCameraOn") private var isCameraOn: Bool = true
+    @State private var isCameraOn = true
     @State private var heartCountAnimation = false
     
     // 신고/차단 관련 상태
     @State private var showReportAlert = false
     @State private var showBlockAlert = false
     @State private var reportReason = ""
-    
-    // Firestore 리스너
-    @State private var heartCountListener: ListenerRegistration?
     
     // 앱 상태 및 백그라운드 감지를 위한 프로퍼티
     @Environment(\.scenePhase) private var scenePhase
@@ -35,8 +32,7 @@ struct VideoCallView: View {
     @State private var backgroundStartTime: Date?
 
     @StateObject private var userManager = UserManager.shared
-    @EnvironmentObject var agoraManager: AgoraManager
-    @EnvironmentObject var matchingManager: MatchingManager
+    @StateObject private var agoraManager = AgoraManager.shared
 
     @Environment(\.presentationMode) var presentationMode
 
@@ -137,8 +133,10 @@ struct VideoCallView: View {
                             // 카메라 아이콘
                             Button(action: {
                                 // 실제 비디오 스트림 제어
-                                let isCameraOff = agoraManager.toggleCamera()
+                                let isCameraOff = AgoraManager.shared.toggleCamera()
                                 isCameraOn = !isCameraOff
+                                // 카메라 상태를 UserDefaults에 저장
+                                UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
                             }) {
                                 Image(systemName: isCameraOn ? "camera.fill" : "camera")
                                     .font(.system(size: 28))
@@ -211,12 +209,13 @@ struct VideoCallView: View {
                         }
                         
                         if let uid = Auth.auth().currentUser?.uid {
-                            // 1) AppStorage를 통해 UI 자동 업데이트
+                            // 1) UI를 즉시 업데이트
                             heartCount -= 1
+                            UserDefaults.standard.set(heartCount, forKey: "heartCount")
                             
                             // 2) 타이머 +60초
                             timeRemaining += 60
-                            matchingManager.updateCallTimer(timeRemaining)
+                            MatchingManager.shared.updateCallTimer(timeRemaining)
                             
                             // 3) 서버에 원자적으로 하트 감소 (FieldValue.increment 사용)
                             userManager.changeHeartCount(uid: uid, delta: -1)
@@ -270,8 +269,6 @@ struct VideoCallView: View {
 
         }
         .onAppear {
-            // Agora 사용 전 커스텀 카메라 세션 중지 (충돌 방지)
-            CameraView.CameraSessionManager.shared.stop()
             setupVideoCall()
         }
         .onChange(of: agoraManager.remoteUserJoined) { joined in
@@ -342,46 +339,19 @@ struct VideoCallView: View {
         print("📱 통화 종료 - 백그라운드 관련 상태 모두 초기화")
         #endif
         
-        // DB에서 ready 상태 및 callStartAt 정리
-        if let matchId = UserDefaults.standard.string(forKey: "currentMatchId"),
-           let currentUserId = Auth.auth().currentUser?.uid {
-            
-            let matchRef = Database.database().reference().child("matches").child(matchId)
-            
-            // 매치 정보에서 내가 user1인지 user2인지 확인
-            matchRef.observeSingleEvent(of: .value) { snapshot in
-                if let data = snapshot.value as? [String: Any],
-                   let user1 = data["user1"] as? String {
-                    
-                    let isUser1 = (user1 == currentUserId)
-                    let myReadyKey = isUser1 ? "user1Ready" : "user2Ready"
-                    
-                    // ready 상태와 callStartAt 초기화
-                    let cleanupUpdates: [String: Any] = [
-                        myReadyKey: false,
-                        "callStartAt": NSNull()
-                    ]
-                    
-                    matchRef.updateChildValues(cleanupUpdates) { error, _ in
-                        if let error = error {
-                            print("❌ DB 상태 정리 실패: \(error)")
-                        } else {
-                            print("✅ DB 상태 정리 완료 (ready: false, callStartAt: null)")
-                        }
-                    }
-                }
-            }
-            
-            if signalEnd {
-                // 내가 종료하는 경우 통화 종료 신호 전송
+        if signalEnd {
+            // 내가 종료하는 경우에만 통화 종료 신호 전송 (matchId 삭제 전에 실행)
+            if let matchId = UserDefaults.standard.string(forKey: "currentMatchId") {
                 MatchingManager.shared.signalCallEnd(matchId: matchId)
-                #if DEBUG
-                print("📡 통화 종료 신호 전송: matchId = \(matchId)")
-                #endif
+                print("📡 통화 종료 신호 전송 시도: matchId = \(matchId)")
+            } else {
+                print("❌ 통화 종료 신호 전송 실패: matchId가 없음")
+                // matchId가 없어도 일단 기본 함수 시도
+                MatchingManager.shared.signalCallEnd()
             }
         }
         
-        // 매칭 상태를 항상 초기화
+        // 매칭 상태를 항상 초기화 (signalEnd 후에 실행하여 matchId 삭제)
         MatchingManager.shared.cancelMatching()
         
         if !signalEnd {
@@ -393,20 +363,15 @@ struct VideoCallView: View {
         timer?.invalidate()
         
         // Agora 연결 종료
-        agoraManager.endCall()
+        AgoraManager.shared.endCall()
         
         // Firebase 리스너 정리
-        matchingManager.cleanupCallObservers()
+        MatchingManager.shared.cleanupCallObservers()
         cleanupCallSyncObservers()
-        
-        // Firestore heartCount 리스너 해제
-        heartCountListener?.remove()
-        heartCountListener = nil
         
         // UserDefaults 정리
         UserDefaults.standard.removeObject(forKey: "currentChannelName")
         UserDefaults.standard.removeObject(forKey: "currentMatchId")
-        PerformanceMonitor.shared.stopPerformanceMonitoring()
     }
     
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
@@ -449,7 +414,7 @@ struct VideoCallView: View {
                 isBackground = false
                 backgroundStartTime = nil
                 
-                // 예약된 종료 작업 안전하게 취소
+                // 예약된 종료 작업 취소 및 초기화
                 backgroundTerminationWorkItem?.cancel()
                 backgroundTerminationWorkItem = nil
                 
@@ -463,7 +428,7 @@ struct VideoCallView: View {
     // MARK: - 하트 실시간 관찰
     func observeHeartCount(uid: String) {
         let db = Firestore.firestore()
-        heartCountListener = db.collection("users").document(uid)
+        db.collection("users").document(uid)
             .addSnapshotListener { documentSnapshot, error in
                 guard let document = documentSnapshot else { return }
                 if let data = document.data(),
@@ -471,6 +436,7 @@ struct VideoCallView: View {
                     if newHeartCount != heartCount {
                         DispatchQueue.main.async {
                             heartCount = newHeartCount
+                            UserDefaults.standard.set(newHeartCount, forKey: "heartCount")
                         }
                     }
                 }
@@ -486,19 +452,14 @@ struct VideoCallView: View {
             .child("newHeart")
             .observe(.childAdded) { snapshot in
                 
-                // AppStorage를 통해 UI 자동 업데이트
+                // 로컬 UI에서 즉시 반영
                 DispatchQueue.main.async {
                     heartCount += 1
+                    UserDefaults.standard.set(heartCount, forKey: "heartCount")
                 }
                 
                 // 서버에 +1 원자적 증가 (FieldValue.increment 사용)
                 userManager.changeHeartCount(uid: uid, delta: +1)
-                
-                // 고유 하트 발신자 기록 및 선호도 갱신
-                if let dict = snapshot.value as? [String: Any],
-                   let fromId = dict["from"] as? String {
-                    UserManager.shared.recordHeartReceived(from: fromId)
-                }
                 
                 // 알림 데이터 삭제
                 snapshot.ref.removeValue()
@@ -515,10 +476,17 @@ struct VideoCallView: View {
     }
     
     private func setupCameraState() {
-        // AppStorage를 통해 자동으로 동기화되므로 추가 설정 불필요
-        // Agora 카메라 상태만 동기화
+        // 메인화면에서 설정한 카메라 상태 복원
+        isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
+        // 기본값이 false이므로 한번도 설정하지 않았다면 true로 설정
+        if UserDefaults.standard.object(forKey: "isCameraOn") == nil {
+            isCameraOn = true
+            UserDefaults.standard.set(true, forKey: "isCameraOn")
+        }
+        
+        // Agora 카메라 상태도 동기화
         if !isCameraOn {
-            _ = agoraManager.toggleCamera()
+            _ = AgoraManager.shared.toggleCamera()
         }
     }
     
@@ -598,117 +566,9 @@ struct VideoCallView: View {
     
     func startVideoCall() {
         isCallActive = true
-        
-        guard let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
-              let matchId = UserDefaults.standard.string(forKey: "currentMatchId"),
-              let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ 채널 정보 또는 사용자 정보 없음")
-            return
+        if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {
+            AgoraManager.shared.startCall(channel: channelName)
         }
-        
-        let matchRef = Database.database().reference().child("matches").child(matchId)
-        
-        // 매치 정보 읽기
-        matchRef.observeSingleEvent(of: .value) { snapshot in
-            guard let data = snapshot.value as? [String: Any],
-                  let user1 = data["user1"] as? String,
-                  let _ = data["user2"] as? String else {
-                print("❌ 매치 정보 읽기 실패")
-                return
-            }
-            
-            let isUser1 = (user1 == currentUserId)
-            let myReadyKey = isUser1 ? "user1Ready" : "user2Ready"
-            let otherReadyKey = isUser1 ? "user2Ready" : "user1Ready"
-            
-            print("🔍 내 역할: \(isUser1 ? "user1" : "user2")")
-            print("🔍 채널명: \(channelName)")
-            
-            // 기존 ready 상태 및 callStartAt 초기화 (현재 사용하지 않음)
-            // let updates: [String: Any] = [
-            //     myReadyKey: true,
-            //     "user1Ready": isUser1 ? true : NSNull(),
-            //     "user2Ready": isUser1 ? NSNull() : true
-            // ]
-            
-            // 내 준비 상태 설정
-            matchRef.child(myReadyKey).setValue(true) { error, _ in
-                if let error = error {
-                    print("❌ Ready 상태 설정 실패: \(error)")
-                    return
-                }
-                
-                print("✅ 내 준비 상태 설정 완료")
-                
-                // callStartAt 관찰 시작
-                var callStartObserver: DatabaseHandle?
-                callStartObserver = matchRef.child("callStartAt").observe(.value) { snapshot in
-                    if let startTime = snapshot.value as? TimeInterval {
-                        print("🕐 통화 시작 시간 감지: \(startTime)")
-                        
-                        // 리스너 제거
-                        if let handle = callStartObserver {
-                            matchRef.child("callStartAt").removeObserver(withHandle: handle)
-                        }
-                        matchRef.child(otherReadyKey).removeAllObservers()
-                        
-                        // 지정된 시간까지 대기
-                        let currentTime = Date().timeIntervalSince1970 * 1000
-                        let delay = max(0, (startTime - currentTime) / 1000)
-                        
-                        print("⏱ \(delay)초 후 채널 입장 예정")
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                            print("🎬 채널 입장 시작: \(channelName)")
-                            self.agoraManager.startCall(channel: channelName)
-                        }
-                    }
-                }
-                
-                // 상대방 준비 상태 체크
-                var otherReadyObserver: DatabaseHandle?
-                otherReadyObserver = matchRef.child(otherReadyKey).observe(.value) { snapshot in
-                    if let isReady = snapshot.value as? Bool, isReady {
-                        print("✅ 상대방도 준비 완료 - 시작 시간 설정")
-                        
-                        // 리스너 제거
-                        if let handle = otherReadyObserver {
-                            matchRef.child(otherReadyKey).removeObserver(withHandle: handle)
-                        }
-                        
-                        // callStartAt이 아직 설정되지 않았다면 설정
-                        matchRef.child("callStartAt").observeSingleEvent(of: .value) { snapshot in
-                            if snapshot.value == nil || snapshot.value is NSNull {
-                                // 현재 시간 + 2초 후로 설정 (밀리초 단위)
-                                let startTime = (Date().timeIntervalSince1970 + 2) * 1000
-                                
-                                print("📝 통화 시작 시간 설정: \(startTime)")
-                                matchRef.child("callStartAt").setValue(startTime)
-                            }
-                        }
-                    }
-                }
-                
-                // 상대방이 이미 준비되었는지 즉시 확인
-                matchRef.child(otherReadyKey).observeSingleEvent(of: .value) { snapshot in
-                    if let isReady = snapshot.value as? Bool, isReady {
-                        print("✅ 상대방이 이미 준비되어 있음")
-                        
-                        // callStartAt 확인 및 설정
-                        matchRef.child("callStartAt").observeSingleEvent(of: .value) { snapshot in
-                            if snapshot.value == nil || snapshot.value is NSNull {
-                                let startTime = (Date().timeIntervalSince1970 + 2) * 1000
-                                print("📝 통화 시작 시간 설정: \(startTime)")
-                                matchRef.child("callStartAt").setValue(startTime)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 통화 시작 시 통화 횟수 증가
-        UserManager.shared.incrementCallCount()
     }
 
     func startTimer() {
@@ -729,34 +589,28 @@ struct VideoCallView: View {
     }
 
     func toggleMute() {
-        isMuted = agoraManager.toggleMute()
+        isMuted = AgoraManager.shared.toggleMute()
     }
 
     func switchCamera() {
-        agoraManager.switchCamera()
+        AgoraManager.shared.switchCamera()
     }
     
     // MARK: - Enhanced Report and Block Functions
     private func reportUser(reason: String) {
         guard !opponentUserId.isEmpty else {
-            #if DEBUG
             print("❌ 신고 실패: 상대방 ID가 없음")
-            #endif
             return
         }
         
         ContentModerationManager.shared.reportUser(reportedUserId: opponentUserId, reason: reason) { success in
             DispatchQueue.main.async {
                 if success {
-                    #if DEBUG
                     print("✅ 신고 완료: \(reason)")
-                    #endif
                     // 신고 완료 후 통화 종료
                     self.endVideoCall()
                 } else {
-                    #if DEBUG
                     print("❌ 신고 실패")
-                    #endif
                 }
             }
         }
@@ -764,28 +618,15 @@ struct VideoCallView: View {
     
     private func blockUser() {
         guard !opponentUserId.isEmpty else {
-            #if DEBUG
             print("❌ 차단 실패: 상대방 ID가 없음")
-            #endif
             return
         }
         
         // 강화된 신고 및 차단 (자동 신고 포함)
         UserManager.shared.reportAndBlockUser(opponentUserId, reason: "사용자 차단")
-        #if DEBUG
         print("✅ 사용자 신고 및 차단: \(opponentUserId)")
-        #endif
         
         // 차단 후 즉시 통화 종료
         endVideoCall()
-    }
-}
-
-// MARK: - Preview for VideoCallView
-struct VideoCallView_Previews: PreviewProvider {
-    static var previews: some View {
-        VideoCallView()
-            .environmentObject(AgoraManager.shared)
-            .environmentObject(MatchingManager.shared)
     }
 }
