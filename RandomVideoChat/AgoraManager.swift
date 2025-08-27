@@ -41,6 +41,9 @@ class AgoraManager: NSObject, ObservableObject {
         #if DEBUG
         print("🔧 Agora 엔진 초기화 시작")
         print("📱 App ID: \(appId)")  // 🆕 App ID 확인
+        
+        // 권한 체크
+        checkPermissions()
         #endif
         
         // 엔진 초기화
@@ -125,9 +128,13 @@ class AgoraManager: NSObject, ObservableObject {
     // MARK: - 통화 시작
     func startCall(channel: String) {
         #if DEBUG
-        print("📱 AgoraManager: startCall - 채널: \(channel)")
-        print("📱 채널 길이: \(channel.count) (최대 64자)")
-        print("📱 App ID: \(appId)")  // 🆕 App ID 확인
+        print("🔴🔴🔴 [AGORA] ========== startCall 시작 ==========")
+        print("🔴 [AGORA] 채널: \(channel)")
+        print("🔴 [AGORA] 채널 길이: \(channel.count) (최대 64자)")
+        print("🔴 [AGORA] App ID: \(appId)")
+        print("🔴 [AGORA] App ID 길이: \(appId.count)")
+        print("🔴 [AGORA] 현재 시간: \(Date())")
+        print("🔴 [AGORA] 엔진 상태: \(agoraKit != nil ? "초기화됨" : "NIL")")
         #endif
         
         // 채널 이름 유효성 검사
@@ -177,8 +184,13 @@ class AgoraManager: NSObject, ObservableObject {
             uid: 0,  // 0은 Agora가 자동으로 UID 할당
             mediaOptions: options
         ) { [weak self] channel, uid, elapsed in
-            print("✅ joinChannel 콜백 호출됨!")
-            print("✅ 채널 참가 성공: \(channel), uid: \(uid), elapsed: \(elapsed)ms")
+            print("🔴🔴🔴 [AGORA SUCCESS] ========== JOIN SUCCESS ==========")
+            print("🔴 [AGORA] 채널 참가 성공!")
+            print("🔴 [AGORA] 채널: \(channel)")
+            print("🔴 [AGORA] 내 UID: \(uid)")
+            print("🔴 [AGORA] 소요시간: \(elapsed)ms")
+            print("🔴 [AGORA] 시간: \(Date())")
+            print("🔴🔴🔴 ======================================")
             self?.localUserId = uid
             DispatchQueue.main.async {
                 self?.isInCall = true
@@ -267,7 +279,11 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     
     // 원격 사용자가 채널에 참가
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinedOfUid uid: UInt, elapsed: Int) {
-        print("👤 원격 사용자 참가: \(uid)")
+        print("🔴🔴🔴 [DEBUG] 원격 사용자 참가 이벤트 발생!")
+        print("   - Remote UID: \(uid)")
+        print("   - Elapsed: \(elapsed)ms")
+        print("   - Channel: \(channelName)")
+        print("   - Local UID: \(localUserId)")
         
         remoteUserId = uid
         
@@ -279,17 +295,59 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         let view = UIView()
         videoCanvas.view = view
         
-        agoraKit?.setupRemoteVideo(videoCanvas)
+        let setupResult = agoraKit?.setupRemoteVideo(videoCanvas) ?? -1
+        print("🔴 [DEBUG] setupRemoteVideo 결과: \(setupResult)")
         
         DispatchQueue.main.async {
+            print("🔴 [DEBUG] 메인 큐에서 remoteVideoView 설정")
             self.remoteVideoView = view
             self.remoteUserJoined = true
             self.remoteVideoEnabled = true  // 사용자 참가 시 비디오 활성화
+            print("🔴 [DEBUG] remoteUserJoined: \(self.remoteUserJoined)")
+            print("🔴 [DEBUG] remoteVideoEnabled: \(self.remoteVideoEnabled)")
+        }
+    }
+    
+    // 네트워크 품질 체크
+    func rtcEngine(_ engine: AgoraRtcEngineKit, networkQuality uid: UInt, txQuality: AgoraNetworkQuality, rxQuality: AgoraNetworkQuality) {
+        if uid == 0 || uid == localUserId {
+            // 로컬 사용자 네트워크 품질
+            print("🔴 [네트워크] 로컬 품질 - TX: \(txQuality.rawValue), RX: \(rxQuality.rawValue)")
+        } else if uid == remoteUserId {
+            // 원격 사용자 네트워크 품질
+            print("🔴 [네트워크] 원격 품질 - TX: \(txQuality.rawValue), RX: \(rxQuality.rawValue)")
+        }
+    }
+    
+    // 오디오 라우트 변경
+    func rtcEngine(_ engine: AgoraRtcEngineKit, didAudioRouteChanged routing: AgoraAudioOutputRouting) {
+        print("🔴 [오디오] 라우트 변경: \(routing.rawValue)")
+        switch routing {
+        case .default:
+            print("   ➡️ 기본")
+        case .headset:
+            print("   🎧 헤드셋")
+        case .earpiece:
+            print("   📦 이어피스")
+        case .headsetNoMic:
+            print("   🎧 마이크 없는 헤드셋")
+        case .speakerphone:
+            print("   🔊 스피커폰")
+        case .loudspeaker:
+            print("   🔊 라우드스피커")
+        // .headsetBluetooth는 일부 SDK 버전에서 지원 안됨
+        // case .headsetBluetooth:
+        //     print("   🎧 블루투스 헤드셋")
+        default:
+            print("   ❓ 알 수 없음")
         }
     }
     
     // 원격 사용자가 채널을 떠남
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
+        print("🔴🔴🔴 [DEBUG] 원격 사용자 나감!")
+        print("   - UID: \(uid)")
+        print("   - Reason: \(reason == .quit ? "QUIT" : "DROPPED")")
         // 강제 종료나 네트워크 문제로 인한 종료인지 확인
         if reason == .dropped {
             // MatchingManager에 통화 종료 신호 전송
@@ -306,7 +364,11 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     
     // 연결 상태 변경
     func rtcEngine(_ engine: AgoraRtcEngineKit, connectionChangedTo state: AgoraConnectionState, reason: AgoraConnectionChangedReason) {
-        print("🔌 연결 상태 변경: \(state.rawValue), 이유: \(reason.rawValue)")
+        print("🔴🔴🔴 [DEBUG] 연결 상태 변경!")
+        print("   - State: \(state.rawValue)")
+        print("   - Reason: \(reason.rawValue)")
+        print("   - Channel: \(channelName)")
+        print("   - Time: \(Date())")
         
         switch state {
         case .disconnected:
@@ -327,17 +389,63 @@ extension AgoraManager: AgoraRtcEngineDelegate {
 
     // 에러 발생
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurError errorCode: AgoraErrorCode) {
-        print("❌ Agora 에러: \(errorCode.rawValue)")
+        print("🔴🔴🔴 [CRITICAL ERROR] Agora 에러 발생!")
+        print("   - Error Code: \(errorCode.rawValue)")
+        print("   - Channel: \(channelName)")
+        print("   - Local UID: \(localUserId)")
+        print("   - Remote UID: \(remoteUserId)")
+        
+        switch errorCode.rawValue {
+        case 101:
+            print("   ⚠️ 원인: App ID 또는 토큰 문제")
+        case 102:
+            print("   ⚠️ 원인: 채널 이름 문제")
+        case 109:
+            print("   ⚠️ 원인: 토큰 만료")
+        case 110:
+            print("   ⚠️ 원인: 유효하지 않은 토큰")
+        default:
+            print("   ⚠️ 원인: 알 수 없음")
+        }
     }
     
     // 경고 발생
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurWarning warningCode: AgoraWarningCode) {
-        print("⚠️ Agora 경고: \(warningCode.rawValue)")
+        print("🔴🔴🔴 [WARNING] Agora 경고!")
+        print("   - Warning Code: \(warningCode.rawValue)")
+        
+        switch warningCode.rawValue {
+        case 103:
+            print("   ⚠️ 경고: 비디오/오디오 디바이스 가용 불가")
+        case 104:
+            print("   ⚠️ 경고: 비디오/오디오 디바이스 릴리스 필요")
+        case 1051:
+            print("   ⚠️ 경고: 네트워크 비슨정상")
+        default:
+            print("   ⚠️ 경고: 기타")
+        }
     }
     
     // 원격 사용자의 비디오 상태 변경
     func rtcEngine(_ engine: AgoraRtcEngineKit, remoteVideoStateChangedOfUid uid: UInt, state: AgoraVideoRemoteState, reason: AgoraVideoRemoteReason, elapsed: Int) {
-        print("📹 원격 비디오 상태 변경: UID \(uid), 상태: \(state.rawValue), 이유: \(reason.rawValue)")
+        print("🔴🔴🔴 [DEBUG] 원격 비디오 상태 변경!")
+        print("   - UID: \(uid)")
+        print("   - State: \(state.rawValue)")
+        print("   - Reason: \(reason.rawValue)")
+        print("   - Elapsed: \(elapsed)ms")
+        
+        switch reason {
+        case .remoteMuted:
+            print("   🔇 원격 사용자가 비디오 음소거")
+        case .remoteUnmuted:
+            print("   🔊 원격 사용자가 비디오 음소거 해제")
+        case .remoteOffline:
+            print("   ❌ 원격 사용자 오프라인")
+        case .audioFallback:
+            print("   ⚠️ 오디오 전용 모드로 전환")
+        default:
+            print("   ℹ️ 기타 이유: \(reason.rawValue)")
+        }
         
         DispatchQueue.main.async {
             switch state {
@@ -429,5 +537,16 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         print("   - Remote User Joined: \(remoteUserJoined)")
         print("   - Remote Video Enabled: \(remoteVideoEnabled)")
         print("   - Is In Call: \(isInCall)")
+    }
+    
+    // 권한 체크
+    private func checkPermissions() {
+        AVCaptureDevice.requestAccess(for: .video) { granted in
+            print("🔴 [권한] 카메라: \(granted ? "✅ 허용" : "❌ 거부")")
+        }
+        
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            print("🔴 [권한] 마이크: \(granted ? "✅ 허용" : "❌ 거부")")
+        }
     }
 }

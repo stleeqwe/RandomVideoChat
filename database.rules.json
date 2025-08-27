@@ -1,20 +1,58 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
     "matching_queue": {
-      ".indexOn": ["bucket", "timestamp", "status", "gender", "preferredGender"],
       ".read": "auth != null",
       "$userId": {
-        ".read": "auth != null",
-        ".write": "auth != null && auth.uid == $userId"
+        ".write": "auth != null"
+      },
+      ".indexOn": ["bucket", "status", "gender", "preferredGender", "timestamp"]
+    },
+    
+    "matching_locks": {
+      ".read": "auth != null",
+      "$lockKey": {
+        ".write": "auth != null"
       }
     },
+    
     "matches": {
       ".read": "auth != null",
       "$matchId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+        ".write": "auth != null",
+        "timeRemaining": {
+          ".write": "auth != null"
+        },
+        "endedBy": {
+          ".write": "auth != null"
+        }
+      },
+      ".indexOn": ["status", "user1", "user2", "timestamp"]
+    },
+    
+    "presence": {
+      ".read": "auth != null",
+      "$userId": {
+        ".write": "auth != null && auth.uid == $userId"
+      },
+      ".indexOn": ["online", "lastSeen"]
+    },
+    
+    "notifications": {
+      ".read": "auth != null",
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        "newHeart": {
+          "$heartId": {
+            ".write": "auth != null"
+          }
+        }
+      }
+    },
+    
+    "user_presence": {
+      ".read": "auth != null",
+      "$userId": {
+        ".write": "auth != null && auth.uid == $userId"
       }
     }
   }

@@ -269,11 +269,19 @@ struct VideoCallView: View {
 
         }
         .onAppear {
+            print("🔴🔴🔴 [VideoCallView] onAppear 호출됨")
             setupVideoCall()
         }
         .onChange(of: agoraManager.remoteUserJoined) { joined in
+            print("🔴🔴🔴 [VideoCallView] remoteUserJoined 변경: \(joined)")
+            print("   - isTimerStarted: \(isTimerStarted)")
+            print("   - remoteVideoEnabled: \(agoraManager.remoteVideoEnabled)")
+            print("   - remoteVideoView: \(agoraManager.remoteVideoView != nil ? "EXISTS" : "NIL")")
+            
             if joined && !isTimerStarted {
+                print("🔴 [VideoCallView] 타이머 시작 예약 (0.5초 후)")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    print("🔴 [VideoCallView] 타이머 시작")
                     startTimer()
                 }
             }
@@ -468,11 +476,23 @@ struct VideoCallView: View {
 
     // MARK: - Video Call Setup and Management
     private func setupVideoCall() {
+        print("🔴🔴🔴 [VideoCallView] setupVideoCall 시작")
+        print("   - Channel: \(UserDefaults.standard.string(forKey: "currentChannelName") ?? "NONE")")
+        print("   - MatchId: \(UserDefaults.standard.string(forKey: "currentMatchId") ?? "NONE")")
+        print("   - Opponent: \(MatchingManager.shared.matchedUserId ?? "NONE")")
+        
         setupCameraState()
         startVideoCall()
         setupUserData()
         setupOpponentObservation()
         setupCallObservers()
+        
+        // Agora 상태 확인
+        print("🔴 [VideoCallView] Agora 초기 상태:")
+        print("   - isInCall: \(agoraManager.isInCall)")
+        print("   - remoteUserJoined: \(agoraManager.remoteUserJoined)")
+        print("   - localVideoView: \(agoraManager.localVideoView != nil ? "EXISTS" : "NIL")")
+        print("   - remoteVideoView: \(agoraManager.remoteVideoView != nil ? "EXISTS" : "NIL")")
     }
     
     private func setupCameraState() {
@@ -503,8 +523,12 @@ struct VideoCallView: View {
     }
     
     private func setupOpponentObservation() {
-        guard let matchedUserId = MatchingManager.shared.matchedUserId else { return }
+        guard let matchedUserId = MatchingManager.shared.matchedUserId else {
+            print("❌ [VideoCallView] matchedUserId가 없음!")
+            return
+        }
         
+        print("🔴 [VideoCallView] setupOpponentObservation - 상대방: \(matchedUserId)")
         opponentUserId = matchedUserId
         UserManager.shared.addRecentMatch(matchedUserId)
         
@@ -565,9 +589,15 @@ struct VideoCallView: View {
     }
     
     func startVideoCall() {
+        print("🔴🔴🔴 [VideoCallView] startVideoCall 호출")
         isCallActive = true
         if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {
+            print("🔴 [VideoCallView] 채널명: \(channelName)")
+            print("🔴 [VideoCallView] AgoraManager.startCall 호출 직전")
             AgoraManager.shared.startCall(channel: channelName)
+            print("🔴 [VideoCallView] AgoraManager.startCall 호출 완료")
+        } else {
+            print("❌ [VideoCallView] 채널명이 없음!")
         }
     }
 

@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/AgoraIO/AgoraInfra_iOS.git",
       "state" : {
-        "revision" : "0071cecee99160f056c943ee6bfca06685ffa3d7",
-        "version" : "1.3.0"
+        "revision" : "a8ba12e25be37080f994a40c5452c1968f7f76fe",
+        "version" : "1.2.30"
       }
     },
     {
