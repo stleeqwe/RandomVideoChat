@@ -61,14 +61,23 @@ class AgoraManager: NSObject, ObservableObject {
         
         // 비디오 활성화 및 설정
         agoraKit.enableVideo()
+        
+        // 네트워크 상황에 더 적응적인 비디오 설정
         let videoConfig = AgoraVideoEncoderConfiguration(
-            size: AgoraVideoDimension640x480,
-            frameRate: .fps30,
-            bitrate: AgoraVideoBitrateStandard,
+            size: AgoraVideoDimension640x360,  // 480p에서 360p로 낮춤 (안정성 향상)
+            frameRate: .fps24,  // 30fps에서 24fps로 낮춤 (대역폭 절약)
+            bitrate: AgoraVideoBitrateCompatible,  // 네트워크 호환성 우선
             orientationMode: .adaptative,
             mirrorMode: .auto
         )
+        videoConfig.degradationPreference = .maintainBalanced  // 균형잡힌 품질 유지
         agoraKit.setVideoEncoderConfiguration(videoConfig)
+        
+        // 비디오 품질 최적화
+        agoraKit.enableDualStreamMode(true)  // 듀얼 스트림 모드 활성화
+        agoraKit.setParameters("{\"rtc.video.prefer_hw_encoder\":true}")  // 하드웨어 인코딩 우선
+        agoraKit.setParameters("{\"che.video.videoCodecIndex\":2}")  // H.264 코덱 사용
+        
         print("✅ 비디오 설정 완료")
         
         // 오디오 설정 (중복 제거, 순서 최적화)
@@ -82,10 +91,16 @@ class AgoraManager: NSObject, ObservableObject {
     private func setupAudioConfiguration() {
         guard let agoraKit = agoraKit else { return }
         
-        // 오디오 세션 설정 (iOS)
+        // 오디오 세션 설정 (iOS) - 더 안정적인 설정
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+            // voiceChat 모드 대신 videoChat 모드 사용 (비디오 채팅에 최적화)
+            try audioSession.setCategory(.playAndRecord, 
+                                        mode: .videoChat, 
+                                        options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+            // 샘플레이트와 버퍼 크기 최적화
+            try audioSession.setPreferredSampleRate(48000)
+            try audioSession.setPreferredIOBufferDuration(0.005) // 5ms 버퍼로 지연 최소화
             try audioSession.setActive(true)
             print("✅ iOS 오디오 세션 설정 완료")
         } catch {
@@ -95,36 +110,53 @@ class AgoraManager: NSObject, ObservableObject {
         // Agora 오디오 설정
         agoraKit.enableAudio()
         
-        // 오디오 프로파일 설정 (음질과 에코 캔슬레이션)
-        agoraKit.setAudioProfile(.musicHighQualityStereo, scenario: .chatRoom)
+        // 오디오 프로파일 - 음성 통화에 최적화된 설정으로 변경
+        agoraKit.setAudioProfile(.speechStandard, scenario: .communication)
         
-        // 에코 캔슬레이션 및 노이즈 억제 강화
+        // 고급 오디오 처리 설정 - 더 강력한 노이즈 억제
         agoraKit.setParameters("{\"che.audio.enable.aec\":true}")
+        agoraKit.setParameters("{\"che.audio.enable.aec3\":true}")  // AEC3 알고리즘 사용
         agoraKit.setParameters("{\"che.audio.enable.ns\":true}")
+        agoraKit.setParameters("{\"che.audio.enable.ns.mode\":2}")  // 더 강력한 노이즈 억제
         agoraKit.setParameters("{\"che.audio.enable.agc\":true}")
+        agoraKit.setParameters("{\"che.audio.agc.mode\":2}")  // 적응형 AGC
         
-        // 오디오 볼륨 설정
-        agoraKit.adjustRecordingSignalVolume(100)
-        agoraKit.adjustPlaybackSignalVolume(100)
+        // 오디오 품질 향상 설정
+        agoraKit.setParameters("{\"che.audio.ans.mode\":2}")  // 적응형 노이즈 억제
+        agoraKit.setParameters("{\"che.audio.enable.vad\":true}")  // 음성 활동 감지
+        agoraKit.setParameters("{\"che.audio.howling.control\":true}")  // 하울링 제어
+        
+        // 네트워크 적응형 설정
+        agoraKit.setParameters("{\"che.audio.enable.dtx\":true}")  // 불연속 전송 (대역폭 절약)
+        agoraKit.setParameters("{\"che.audio.enable.fec\":true}")  // 전방 오류 수정
+        
+        // 오디오 볼륨 설정 - 더 보수적인 값으로 조정
+        agoraKit.adjustRecordingSignalVolume(85)  // 100에서 85로 감소 (피드백 방지)
+        agoraKit.adjustPlaybackSignalVolume(90)   // 100에서 90으로 감소
         
         // 스피커폰 기본 설정
         agoraKit.setDefaultAudioRouteToSpeakerphone(true)
+        agoraKit.setEnableSpeakerphone(true)
         
-        print("✅ 오디오 설정 완료")
+        print("✅ 고급 오디오 설정 완료")
     }
     
     // MARK: - 로컬 비디오 설정
     private func setupLocalVideo() {
         let videoCanvas = AgoraRtcVideoCanvas()
         videoCanvas.uid = 0
-        videoCanvas.renderMode = .hidden
+        videoCanvas.renderMode = .fit  // hidden 대신 fit 사용
         
         let view = UIView()
         view.backgroundColor = .black
+        view.clipsToBounds = true  // 뷰 경계 처리
         videoCanvas.view = view
         
         agoraKit?.setupLocalVideo(videoCanvas)
         agoraKit?.startPreview()
+        
+        // 로컬 비디오 미러링 설정 (전면 카메라)
+        agoraKit?.setLocalVideoMirrorMode(.enabled)
         
         DispatchQueue.main.async {
             self.localVideoView = view
@@ -153,9 +185,25 @@ class AgoraManager: NSObject, ObservableObject {
         
         self.channelName = channel
         
+        // 오디오 세션 재활성화 (통화 시작 시)
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setActive(true)
+            print("✅ 오디오 세션 재활성화")
+        } catch {
+            print("❌ 오디오 세션 재활성화 실패: \(error)")
+        }
+        
         // 채널 참가 전 오디오/비디오 명시적 활성화
         engine.enableLocalVideo(true)
         engine.enableLocalAudio(true)
+        engine.muteLocalAudioStream(false)
+        engine.muteLocalVideoStream(false)
+        
+        // 네트워크 최적화 설정
+        engine.setParameters("{\"rtc.enable_quick_udp_transport\":true}")  // QUIC 전송 활성화
+        engine.setParameters("{\"rtc.network.tcp_cc\":true}")  // TCP 혼잡 제어
+        engine.setParameters("{\"rtc.network.auto_adjust_target_bitrate\":true}")  // 자동 비트레이트 조정
         
         // 채널 옵션 설정 (수정됨)
         let options = AgoraRtcChannelMediaOptions()
@@ -178,6 +226,13 @@ class AgoraManager: NSObject, ObservableObject {
             self?.localUserId = uid
             DispatchQueue.main.async {
                 self?.isInCall = true
+                
+                // 채널 참가 후 추가 최적화
+                self?.agoraKit?.setRemoteDefaultVideoStreamType(.low)  // 초기에는 저화질 스트림
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // 2초 후 고화질로 전환
+                    self?.agoraKit?.setRemoteDefaultVideoStreamType(.high)
+                }
             }
         }
         

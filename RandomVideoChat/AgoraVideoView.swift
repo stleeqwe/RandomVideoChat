@@ -12,6 +12,8 @@ struct AgoraVideoView: UIViewRepresentable {
         
         let view = UIView()
         view.backgroundColor = .black
+        view.clipsToBounds = true  // 뷰 경계 처리
+        view.contentMode = .scaleAspectFit  // 비디오 비율 유지
         
         // 초기 뷰 설정
         updateVideoView(view)
@@ -39,6 +41,13 @@ struct AgoraVideoView: UIViewRepresentable {
             #endif
         }
         
+        // 비디오 뷰가 이미 추가되어 있는지 확인
+        if let existingVideo = videoView, existingVideo.superview == containerView {
+            // 이미 추가되어 있으면 위치만 업데이트
+            existingVideo.frame = containerView.bounds
+            return
+        }
+        
         // 카메라가 꺼져있는지 확인
         let shouldShowProfile = (isLocal && agoraManager.isCameraOff) || 
                                (!isLocal && agoraManager.remoteUserJoined && !agoraManager.remoteVideoEnabled)
@@ -47,12 +56,17 @@ struct AgoraVideoView: UIViewRepresentable {
             // Hide profile if present
             containerView.viewWithTag(profileTag)?.isHidden = true
             if videoView.superview !== containerView {
+                // 기존 비디오 뷰 제거
                 containerView.subviews.forEach { sub in
                     if sub.tag == profileTag { return }
                     sub.removeFromSuperview()
                 }
+                
+                // 비디오 뷰 추가 및 제약 설정
                 containerView.addSubview(videoView)
                 videoView.translatesAutoresizingMaskIntoConstraints = false
+                videoView.contentMode = .scaleAspectFit  // 비디오 비율 유지
+                
                 NSLayoutConstraint.activate([
                     videoView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
                     videoView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
@@ -61,6 +75,7 @@ struct AgoraVideoView: UIViewRepresentable {
                 ])
             }
             videoView.isHidden = false
+            videoView.setNeedsLayout()  // 레이아웃 강제 업데이트
         } else {
             // 비디오가 없거나 카메라가 꺼진 상태일 때 프로필 화면 표시
             let profileView: UIView
