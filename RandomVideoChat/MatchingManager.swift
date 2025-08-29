@@ -263,8 +263,8 @@ class MatchingManager: ObservableObject {
                 self.isMatched = true
                 self.isMatching = false
                 
-                // 🆕 수정: 큐에서 제거를 더 늦춤 (15초) 또는 제거하지 않음
-                DispatchQueue.main.asyncAfter(deadline: .now() + 15.0) {
+                // 수정: 큐에서 즉시 제거 또는 3초 후 제거 (15초는 너무 김)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     self.removeFromQueue(userId: userId)
                 }
             }
