@@ -1,0 +1,13 @@
+.DS_Store
+DerivedData/
+build/
+node_modules/
+xcuserdata/
+RandomVideoChat.xcodeproj/xcuserdata/
+RandomVideoChat.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+.swiftpm/
+.build/
+Pods/
+*.ipa
+*.dSYM
