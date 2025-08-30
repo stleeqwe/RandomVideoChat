@@ -462,6 +462,8 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             self.remoteVideoEnabled = true
             
             print("✅ 원격 비디오 설정 완료 - 비디오 구독 활성화")
+            // Set initial remote stream based on current network quality
+            self.applyRemoteStreamType(for: uid, quality: self.networkMonitor.networkQuality)
         }
     }
     
@@ -625,15 +627,42 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             // 네트워크 품질에 따른 자동 조정
             DispatchQueue.main.async { [weak self] in
                 self?.adjustQualityBasedOnNetwork(txQuality: txQuality, rxQuality: rxQuality)
+                // Switch incoming remote stream based on local perceived quality
+                if let self = self, self.remoteUserId != 0 {
+                    let worst = max(txQuality.rawValue, rxQuality.rawValue)
+                    // Map worst Agora quality to our NetworkQuality
+                    let mapped: NetworkMonitor.NetworkQuality = (worst >= AgoraNetworkQuality.bad.rawValue) ? .poor : .good
+                    self.applyRemoteStreamType(for: self.remoteUserId, quality: mapped)
+                }
             }
         } else if uid == remoteUserId {
             print("📶 원격 네트워크 품질 - TX: \(txQuality.rawValue), RX: \(rxQuality.rawValue)")
+            // Optionally adjust using remote's downlink quality as hint
+            let mapped = mapAgoraToNetworkQuality(rxQuality)
+            applyRemoteStreamType(for: uid, quality: mapped)
         }
     }
 }
 
 // MARK: - Network Adaptation Methods
 extension AgoraManager {
+    // MARK: - Dual-stream: switch incoming stream per network quality
+    func applyRemoteStreamType(for uid: UInt, quality: NetworkMonitor.NetworkQuality) {
+        guard let engine = agoraKit, uid != 0 else { return }
+        let type: AgoraVideoStreamType = (quality == .poor) ? .low : .high
+        engine.setRemoteVideoStream(uid, type: type)
+        print("🎚️ Remote stream for uid=\(uid) -> \(type == .low ? "LOW" : "HIGH") based on quality=\(quality)")
+    }
+
+    private func mapAgoraToNetworkQuality(_ q: AgoraNetworkQuality) -> NetworkMonitor.NetworkQuality {
+        switch q {
+        case .excellent: return .excellent
+        case .good: return .good
+        case .poor: return .fair   // treat Agora 'poor' as our 'fair'
+        case .bad, .veryBad, .down: return .poor
+        default: return networkMonitor.networkQuality
+        }
+    }
     // 네트워크 적응형 설정
     private func setupNetworkAdaptation() {
         // 네트워크 모니터 관찰
