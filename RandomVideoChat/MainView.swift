@@ -4,7 +4,8 @@ import AVFoundation
 
 @available(iOS 15.0, *)
 struct MainView: View {
-    @AppStorage("isCameraOn") private var isCameraOn: Bool = true
+    // Main screen preview should not depend on in-call camera state
+    @AppStorage("isMainPreviewOn") private var isMainPreviewOn: Bool = true
     @AppStorage("heartCount") private var heartCount: Int = 3  // 기본 하트 개수
     @State private var showMatchingView = false
     @StateObject private var userManager = UserManager.shared
@@ -21,11 +22,14 @@ struct MainView: View {
     @State private var myGender: Gender?
     @State private var preferredGender: Gender?
     
+    // Scene phase for lifecycle management
+    @Environment(\.scenePhase) private var scenePhase
+    
     var body: some View {
         ZStack {
-            if isCameraOn {
-                // 실제 카메라 프리뷰
-                CameraPreview(isOn: $isCameraOn)
+            if isMainPreviewOn {
+                // 개선된 카메라 프리뷰 사용
+                ImprovedCameraPreview(isOn: $isMainPreviewOn)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // 카메라 off 상태 기본 프로필 화면
@@ -105,9 +109,9 @@ struct MainView: View {
                     // 카메라 아이콘과 하트 카운터 (우측 상단)
                     VStack(spacing: 12) {
                         Button(action: {
-                            isCameraOn.toggle()
+                            isMainPreviewOn.toggle()
                         }) {
-                            Image(systemName: isCameraOn ? "camera.fill" : "camera")
+                            Image(systemName: isMainPreviewOn ? "camera.fill" : "camera")
                                 .font(.system(size: 28))
                                 .foregroundColor(.white)
                         }
@@ -251,6 +255,14 @@ struct MainView: View {
 
             // 권한 요청 (중복 방지)
             requestCameraAndMicrophonePermissions()
+            
+            // 메인 화면 진입 시 Agora 로컬 프리뷰가 켜져 있다면 중지하여 카메라 충돌 방지
+            AgoraManager.shared.stopLocalPreviewIfIdle()
+
+            // 카메라 매니저 초기화 및 시작
+            if isMainPreviewOn {
+                CameraManager.shared.resumeSession()
+            }
 
             // 일일 출석 보상 체크
             DailyRewardManager.shared.checkAndGrantDailyReward { granted, message in
@@ -266,6 +278,25 @@ struct MainView: View {
             Button("확인") { }
         } message: {
             Text(dailyRewardMessage)
+        }
+        .onChange(of: scenePhase) { newPhase in
+            switch newPhase {
+            case .active:
+                // App became active - resume camera if needed
+                print("📱 ScenePhase: active (main preview on: \(isMainPreviewOn))")
+                if isMainPreviewOn && !showMatchingView {
+                    CameraManager.shared.resumeSession()
+                }
+            case .inactive:
+                // Do not stop session on inactive (e.g., permission prompts)
+                print("📱 ScenePhase: inactive (no-op)")
+            case .background:
+                // App went to background - stop camera
+                print("📱 ScenePhase: background -> stop camera session")
+                CameraManager.shared.stopSession()
+            @unknown default:
+                break
+            }
         }
         .onReceive(userManager.$currentUser) { user in
             // Firestore에서 가져온 값 우선 사용

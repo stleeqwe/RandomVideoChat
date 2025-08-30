@@ -9,7 +9,7 @@ import FirebaseDatabase
 @available(iOS 15.0, *)
 struct VideoCallView: View {
     @State private var isCallActive = false
-    @State private var timeRemaining = 5
+    @State private var timeRemaining = 120  // Changed from 5 seconds to 120 seconds (2 minutes)
     @State private var isTimerStarted = false
     @State private var timer: Timer?
     @State private var isMuted = false
@@ -184,9 +184,10 @@ struct VideoCallView: View {
                 Spacer()
                 
                 HStack {
-                    Text("\(timeRemaining)")
+                    // 타이머를 분:초 형식으로 표시
+                    Text(formatTime(timeRemaining))
                         .font(.custom("Carter One", size: 36))
-                        .foregroundColor(timeRemaining <= 5 ? .red : .white)
+                        .foregroundColor(timeRemaining <= 10 ? .red : .white)  // 10초 이하에서 빨간색
                         .monospacedDigit()
                         .padding(.leading, 20)
                         .padding(.bottom, 180)
@@ -386,24 +387,27 @@ struct VideoCallView: View {
                 backgroundStartTime = Date()
                 
                 #if DEBUG
-                print("📱 백그라운드 진입 - 30초 타이머 시작")
+                print("📱 백그라운드 진입 - 타이머 일시중지")
                 #endif
+                
+                // 타이머 일시중지 (백그라운드에서는 타이머 중지)
+                timer?.invalidate()
                 
                 // 기존 타이머가 있다면 취소 (안전장치)
                 backgroundTerminationWorkItem?.cancel()
                 
-                // 30초 후 통화 종료를 예약
+                // 60초 후 통화 종료를 예약 (기존 30초에서 60초로 연장)
                 let workItem = DispatchWorkItem {
                     if self.isBackground && !self.isCallEnding {
                         #if DEBUG
-                        print("📱 백그라운드 30초 경과 - 통화 종료")
+                        print("📱 백그라운드 60초 경과 - 통화 종료")
                         #endif
                         self.cleanupAfterCallEnd(signalEnd: true)
                         self.presentationMode.wrappedValue.dismiss()
                     }
                 }
                 backgroundTerminationWorkItem = workItem
-                DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: workItem)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: workItem)
             }
             
         } else if newPhase == .active {
@@ -422,8 +426,19 @@ struct VideoCallView: View {
                 backgroundTerminationWorkItem?.cancel()
                 backgroundTerminationWorkItem = nil
                 
+                // 타이머 재시작 (포어그라운드 복귀 시)
+                if isTimerStarted && !isCallEnding {
+                    startTimer()
+                }
+                
+                // 비디오 스트림 재활성화 (필요한 경우)
+                if AgoraManager.shared.isInCall {
+                    AgoraManager.shared.agoraKit?.enableLocalVideo(true)
+                    AgoraManager.shared.agoraKit?.startPreview()
+                }
+                
                 #if DEBUG
-                print("📱 백그라운드 타이머 완전 초기화 완료")
+                print("📱 백그라운드 타이머 완전 초기화 및 비디오 재시작 완료")
                 #endif
             }
         }
@@ -646,6 +661,13 @@ struct VideoCallView: View {
 
     func switchCamera() {
         AgoraManager.shared.switchCamera()
+    }
+    
+    // 타이머 포맷팅 함수
+    private func formatTime(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
     
     // MARK: - Enhanced Report and Block Functions

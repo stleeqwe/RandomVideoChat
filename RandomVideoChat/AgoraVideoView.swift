@@ -30,6 +30,10 @@ struct AgoraVideoView: UIViewRepresentable {
         let videoView: UIView?
         
         if isLocal {
+            if agoraManager.localVideoView == nil {
+                // Ensure local preview is prepared when requested
+                agoraManager.ensureLocalPreviewStarted()
+            }
             videoView = agoraManager.localVideoView
             #if DEBUG
             print("📹 로컬 비디오 뷰 업데이트")

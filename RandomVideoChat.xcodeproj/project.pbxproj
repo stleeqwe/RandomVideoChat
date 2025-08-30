@@ -47,6 +47,8 @@
 		88ABCD001122334455667701 /* HeartPurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667700 /* HeartPurchaseView.swift */; };
 		88ABCD001122334455667703 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667702 /* StoreKitManager.swift */; };
 		88ABCD001122334455667706 /* DailyRewardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667704 /* DailyRewardManager.swift */; };
+		88NET0012E80000001234567 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88NET0002E80000001234567 /* NetworkMonitor.swift */; };
+		88CAM0012E90000001234567 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CAM0002E90000001234567 /* CameraManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -104,6 +106,8 @@
 		88ABCD001122334455667700 /* HeartPurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartPurchaseView.swift; sourceTree = "<group>"; };
 		88ABCD001122334455667702 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		88ABCD001122334455667704 /* DailyRewardManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRewardManager.swift; sourceTree = "<group>"; };
+		88NET0002E80000001234567 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		88CAM0002E90000001234567 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,6 +191,8 @@
 				88C07E282E4178D1004A3F93 /* MatchingManager.swift */,
 				88C07E332E4220B1004A3F93 /* AgoraVideoView.swift */,
 				88C07E352E422205004A3F93 /* AgoraManager.swift */,
+				88NET0002E80000001234567 /* NetworkMonitor.swift */,
+				88CAM0002E90000001234567 /* CameraManager.swift */,
 				88SWP0002E80000001234567 /* SwipeHintView.swift */,
 				88APP0002E90000001234567 /* AppleSignInView.swift */,
 				88SGN0002EA0000001234567 /* SignUpView.swift */,
@@ -386,6 +392,8 @@
 				88MEM0012E70000001234567 /* MemoryLeakDetector.swift in Sources */,
 				88IMG0012E70000001234567 /* ImageCacheManager.swift in Sources */,
 				88C07E272E4177C0004A3F93 /* UserManager.swift in Sources */,
+				88NET0012E80000001234567 /* NetworkMonitor.swift in Sources */,
+				88CAM0012E90000001234567 /* CameraManager.swift in Sources */,
 				8871CC782E40E3DE0096BD2F /* SplashView.swift in Sources */,
 				88SWP0012E80000001234567 /* SwipeHintView.swift in Sources */,
 				88APP0012E90000001234567 /* AppleSignInView.swift in Sources */,
