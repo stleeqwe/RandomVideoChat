@@ -87,6 +87,9 @@ class AgoraManager: NSObject, ObservableObject {
         agoraKit.enableDualStreamMode(true)  // 듀얼 스트림 모드 활성화
         agoraKit.setParameters("{\"rtc.video.prefer_hw_encoder\":true}")  // 하드웨어 인코딩 우선
         agoraKit.setParameters("{\"che.video.videoCodecIndex\":2}")  // H.264 코덱 사용
+        // 자동 오디오 전환 폴백 설정: 네트워크가 나빠지면 오디오만 퍼블리시/구독
+        agoraKit.setLocalPublishFallbackOption(.audioOnly)
+        agoraKit.setRemoteSubscribeFallbackOption(.audioOnly)
         
         // 네트워크 적응 최적화
         agoraKit.setParameters("{\"che.video.quickAdaptNetwork\":true}")  // 빠른 네트워크 적응
