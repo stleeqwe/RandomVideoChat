@@ -64,8 +64,20 @@ class AgoraManager: NSObject, ObservableObject {
         
         // 비디오 활성화 및 설정
         agoraKit.enableVideo()
-        
-        // 네트워크 적응형 비디오 설정
+
+        // Default downshift: 640x360 @ 15fps, 400kbps to ensure smooth startup
+        var defaultCfg = AgoraVideoEncoderConfiguration(
+            size: AgoraVideoDimension640x360,
+            frameRate: .fps15,
+            bitrate: 400,
+            orientationMode: .adaptative,
+            mirrorMode: .auto
+        )
+        defaultCfg.degradationPreference = .maintainFramerate
+        agoraKit.setVideoEncoderConfiguration(defaultCfg)
+        print("📹 Default encoder set: 640x360@15fps/400kbps (maintainFramerate)")
+
+        // Keep adaptive logic to upscale when network allows
         updateVideoConfigForNetwork()
         
         // 네트워크 변경 감지 및 자동 조정
