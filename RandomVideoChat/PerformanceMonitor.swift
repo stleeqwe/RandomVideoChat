@@ -57,11 +57,14 @@ class PerformanceMonitor {
         }
     }
     
-    // MARK: - Network Quality Detection
+    // MARK: - Network Quality Detection (real-world)
     func getNetworkQuality() -> NetworkQuality {
-        // 실제 네트워크 상태를 측정하는 로직
-        // 여기서는 간단한 예시
-        return .good
+        // Map from real-world NetworkQualityMonitor to simplified buckets
+        let q = NetworkQualityMonitor.shared.currentQuality
+        switch q {
+        case .poor: return .poor
+        case .excellent, .good, .fair: return .good
+        }
     }
     
     // MARK: - Performance Metrics Collection

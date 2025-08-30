@@ -465,8 +465,8 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             self.remoteVideoEnabled = true
             
             print("✅ 원격 비디오 설정 완료 - 비디오 구독 활성화")
-            // Set initial remote stream based on current network quality
-            self.applyRemoteStreamType(for: uid, quality: self.networkMonitor.networkQuality)
+            // Set initial remote stream based on real-world network quality
+            self.applyRemoteStreamType(for: uid, quality: NetworkQualityMonitor.shared.currentQuality)
         }
     }
     
@@ -627,22 +627,28 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         if uid == 0 {
             print("📶 로컬 네트워크 품질 - TX: \(txQuality.rawValue), RX: \(rxQuality.rawValue)")
             
-            // 네트워크 품질에 따른 자동 조정
+            // 네트워크 품질에 따른 자동 조정 + 실측 모니터 갱신
             DispatchQueue.main.async { [weak self] in
-                self?.adjustQualityBasedOnNetwork(txQuality: txQuality, rxQuality: rxQuality)
-                // Switch incoming remote stream based on local perceived quality
-                if let self = self, self.remoteUserId != 0 {
-                    let worst = max(txQuality.rawValue, rxQuality.rawValue)
-                    // Map worst Agora quality to our NetworkQuality
-                    let mapped: NetworkMonitor.NetworkQuality = (worst >= AgoraNetworkQuality.bad.rawValue) ? .poor : .good
-                    self.applyRemoteStreamType(for: self.remoteUserId, quality: mapped)
+                guard let self = self else { return }
+                self.adjustQualityBasedOnNetwork(txQuality: txQuality, rxQuality: rxQuality)
+                NetworkQualityMonitor.shared.update(tx: txQuality, rx: rxQuality)
+                if self.remoteUserId != 0 {
+                    self.applyRemoteStreamType(for: self.remoteUserId, quality: NetworkQualityMonitor.shared.currentQuality)
                 }
             }
         } else if uid == remoteUserId {
             print("📶 원격 네트워크 품질 - TX: \(txQuality.rawValue), RX: \(rxQuality.rawValue)")
-            // Optionally adjust using remote's downlink quality as hint
-            let mapped = mapAgoraToNetworkQuality(rxQuality)
-            applyRemoteStreamType(for: uid, quality: mapped)
+            // 원격의 품질도 모니터에 반영
+            NetworkQualityMonitor.shared.update(tx: txQuality, rx: rxQuality)
+            applyRemoteStreamType(for: uid, quality: NetworkQualityMonitor.shared.currentQuality)
+        }
+    }
+
+    // 실측 원격 비디오 통계 (손실률/지연/비트레이트)
+    func rtcEngine(_ engine: AgoraRtcEngineKit, remoteVideoStats stats: AgoraRtcRemoteVideoStats) {
+        NetworkQualityMonitor.shared.update(loss: Int(stats.packetLossRate), rtt: Int(stats.delay), bitrate: Int(stats.receivedBitrate))
+        if remoteUserId != 0 {
+            applyRemoteStreamType(for: remoteUserId, quality: NetworkQualityMonitor.shared.currentQuality)
         }
     }
 }
