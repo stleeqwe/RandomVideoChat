@@ -41,6 +41,10 @@ class AgoraManager: NSObject, ObservableObject {
         case disconnected
     }
     @Published var connectionState: ConnectionStateUI = .connected
+
+    // Engine lifecycle workaround flag: when true, destroy engine on endCall
+    // Keep default as false to maintain singleton engine per SDK guidance
+    var destroyEngineOnEndCall: Bool = false
     
     override init() {
         super.init()
@@ -358,24 +362,65 @@ class AgoraManager: NSObject, ObservableObject {
     // MARK: - 통화 종료
     func endCall() {
         print("📱 통화 종료")
-        
-        // 오디오 세션 비활성화
-        do {
-            try AVAudioSession.sharedInstance().setActive(false)
-        } catch {
-            print("❌ 오디오 세션 비활성화 실패: \(error)")
+
+        guard let engine = agoraKit else {
+            // Already torn down
+            DispatchQueue.main.async {
+                self.isInCall = false
+                self.remoteUserJoined = false
+                self.remoteVideoEnabled = false
+                self.remoteUserId = 0
+                self.channelName = ""
+                self.localVideoView = nil
+                self.remoteVideoView = nil
+            }
+            return
         }
-        
-        agoraKit?.leaveChannel(nil)
-        agoraKit?.stopPreview()
-        
+
+        // Release SDK canvas references before leaving
+        // 1) Local canvas -> nil
+        let localCanvas = AgoraRtcVideoCanvas()
+        localCanvas.uid = 0
+        localCanvas.view = nil
+        engine.setupLocalVideo(localCanvas)
+
+        // 2) Remote canvas -> nil
+        if remoteUserId != 0 {
+            let remoteCanvas = AgoraRtcVideoCanvas()
+            remoteCanvas.uid = remoteUserId
+            remoteCanvas.view = nil
+            engine.setupRemoteVideo(remoteCanvas)
+        }
+
+        // Disable media, stop preview, then leave channel (in this order)
+        engine.disableVideo()
+        engine.disableAudio()
+        engine.stopPreview()
+        engine.leaveChannel(nil)
+
+        // Clean up local references
         DispatchQueue.main.async {
             self.isInCall = false
             self.remoteUserJoined = false
             self.remoteVideoEnabled = false
             self.remoteUserId = 0
             self.channelName = ""
+            self.localVideoView = nil
             self.remoteVideoView = nil
+        }
+
+        // Optionally destroy engine to mitigate memory issues (opt-in)
+        if destroyEngineOnEndCall {
+            AgoraRtcEngineKit.destroy()
+            self.agoraKit = nil
+            print("🧹 Agora engine destroyed (memory workaround enabled)")
+        }
+
+        // Deactivate iOS audio session last
+        do {
+            try AVAudioSession.sharedInstance().setActive(false)
+        } catch {
+            print("❌ 오디오 세션 비활성화 실패: \(error)")
         }
     }
     
@@ -486,6 +531,12 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             MatchingManager.shared.signalCallEnd()
         }
         
+        // Free internal SDK reference for the remote canvas
+        let canvas = AgoraRtcVideoCanvas()
+        canvas.uid = uid
+        canvas.view = nil
+        agoraKit?.setupRemoteVideo(canvas)
+
         DispatchQueue.main.async {
             self.remoteUserJoined = false
             self.remoteVideoEnabled = false
