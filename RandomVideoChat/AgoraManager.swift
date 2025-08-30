@@ -133,11 +133,11 @@ class AgoraManager: NSObject, ObservableObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             // videoChat 모드로 최적화된 에코 캔슬레이션 활성화
-            // 기본 라우트 스피커 유지
+            // 기본 라우트를 수화기로 설정 (하울링 방지)
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .videoChat,
-                options: [.allowBluetooth, .defaultToSpeaker]
+                options: [.allowBluetooth]  // defaultToSpeaker 제거
             )
             // mixWithOthers 제거하여 오디오 피드백 방지
             
@@ -153,7 +153,7 @@ class AgoraManager: NSObject, ObservableObject {
         // Agora 오디오 설정
         agoraKit.enableAudio()
         
-        // 오디오 프로파일 - 유지: speechStandard + default scenario
+        // 오디오 프로파일 - 에코 캔슬레이션 최적화
         agoraKit.setAudioProfile(.speechStandard, scenario: .default)
         
         // 고급 오디오 처리 설정 - 최대 에코 캔슬레이션
@@ -161,10 +161,13 @@ class AgoraManager: NSObject, ObservableObject {
         agoraKit.setParameters("{\"che.audio.enable.aec3\":true}")  // AEC3 알고리즘 사용
         agoraKit.setParameters("{\"che.audio.aec.nlp_enabled\":true}")  // 비선형 처리 활성화
         agoraKit.setParameters("{\"che.audio.aec.delay_agnostic_enabled\":true}")  // 지연 무관 AEC
+        agoraKit.setParameters("{\"che.audio.aec.mode\":2}")  // 공격적 에코 캔슬레이션 모드
         agoraKit.setParameters("{\"che.audio.enable.ns\":true}")
         agoraKit.setParameters("{\"che.audio.enable.ns.mode\":2}")  // 더 강력한 노이즈 억제
         agoraKit.setParameters("{\"che.audio.enable.agc\":true}")
         agoraKit.setParameters("{\"che.audio.agc.mode\":2}")  // 적응형 AGC
+        agoraKit.setParameters("{\"che.audio.agc.target_level_dbov\":3}")  // AGC 타겟 레벨 (더 큰 소리)
+        agoraKit.setParameters("{\"che.audio.agc.compression_gain\":18}")  // AGC 압축 게인 증가
         
         // 오디오 품질 향상 설정
         agoraKit.setParameters("{\"che.audio.ans.mode\":2}")  // 적응형 노이즈 억제
@@ -175,15 +178,15 @@ class AgoraManager: NSObject, ObservableObject {
         agoraKit.setParameters("{\"che.audio.enable.dtx\":true}")  // 불연속 전송 (대역폭 절약)
         agoraKit.setParameters("{\"che.audio.enable.fec\":true}")  // 전방 오류 수정
         
-        // 오디오 볼륨 설정 (보수적)
-        agoraKit.adjustRecordingSignalVolume(70)
-        agoraKit.adjustPlaybackSignalVolume(75)
-        agoraKit.adjustAudioMixingPlayoutVolume(70)
+        // 오디오 볼륨 설정 (적절한 볼륨으로 조정)
+        agoraKit.adjustRecordingSignalVolume(85)  // 마이크 입력 볼륨 증가
+        agoraKit.adjustPlaybackSignalVolume(90)   // 스피커 출력 볼륨 증가
+        agoraKit.adjustAudioMixingPlayoutVolume(85)  // 오디오 믹싱 볼륨
         
-        // 기본 오디오 라우트: 스피커폰 유지
-        agoraKit.setDefaultAudioRouteToSpeakerphone(true)
-        agoraKit.setEnableSpeakerphone(true)
-        isSpeakerEnabled = true
+        // 기본 오디오 라우트: 수화기 (하울링 방지)
+        agoraKit.setDefaultAudioRouteToSpeakerphone(false)
+        agoraKit.setEnableSpeakerphone(false)
+        isSpeakerEnabled = false
         
         print("✅ 고급 오디오 설정 완료")
     }
@@ -267,11 +270,18 @@ class AgoraManager: NSObject, ObservableObject {
             print("❌ 오디오 세션 재활성화 실패: \(error)")
         }
         
-        // 채널 참가 전 오디오/비디오 명시적 활성화
-        engine.enableLocalVideo(true)
+        // 채널 참가 전 오디오/비디오 설정 (카메라 상태 확인)
         engine.enableLocalAudio(true)
         engine.muteLocalAudioStream(false)
-        engine.muteLocalVideoStream(false)
+        
+        // 카메라 상태에 따라 비디오 설정
+        if !isCameraOff {
+            engine.enableLocalVideo(true)
+            engine.muteLocalVideoStream(false)
+        } else {
+            engine.enableLocalVideo(false)
+            engine.muteLocalVideoStream(true)
+        }
         
         // 네트워크 최적화 설정 (모든 네트워크 환경 대응)
         engine.setParameters("{\"rtc.enable_quick_udp_transport\":true}")  // QUIC 전송 활성화
@@ -536,8 +546,34 @@ class AgoraManager: NSObject, ObservableObject {
     // MARK: - 카메라 토글
     func toggleCamera() -> Bool {
         isCameraOff.toggle()
-        agoraKit?.muteLocalVideoStream(isCameraOff)
-        print("📹 카메라: \(isCameraOff ? "OFF" : "ON")")
+        
+        if isCameraOff {
+            // 카메라 OFF: 비디오 트랙 publish 중지
+            let options = AgoraRtcChannelMediaOptions()
+            options.publishCameraTrack = false  // 카메라 트랙 전송 중지
+            options.publishMicrophoneTrack = true  // 마이크는 계속 전송
+            agoraKit?.updateChannel(with: options)
+            
+            // 로컬 비디오도 중지
+            agoraKit?.enableLocalVideo(false)
+            agoraKit?.stopPreview()
+            print("📹 카메라 OFF - 비디오 publish 중지")
+        } else {
+            // 카메라 ON: 비디오 트랙 publish 재개
+            let options = AgoraRtcChannelMediaOptions()
+            options.publishCameraTrack = true  // 카메라 트랙 전송 재개
+            options.publishMicrophoneTrack = true  // 마이크 계속 전송
+            agoraKit?.updateChannel(with: options)
+            
+            // 로컬 비디오 재시작
+            agoraKit?.enableLocalVideo(true)
+            if localVideoView != nil {
+                agoraKit?.startPreview()
+            }
+            
+            print("📹 카메라 ON - 비디오 publish 재개")
+        }
+        
         return isCameraOff
     }
     
@@ -718,8 +754,12 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         DispatchQueue.main.async {
             switch state {
             case .stopped, .failed:
-                // frozen 상태는 일시적일 수 있으므로 즉시 비활성화하지 않음
                 self.remoteVideoEnabled = false
+                // 비디오가 중지되면 원격 비디오 뷰를 nil로 설정
+                if reason == .remoteMuted || reason == .localMuted {
+                    print("   ➜ 원격 비디오 음소거/중지 - 프로필 화면 표시")
+                    self.remoteVideoView = nil
+                }
                 print("   ➜ 원격 비디오 비활성화")
             case .frozen:
                 // frozen 상태에서는 3초 대기 후 여전히 frozen이면 비활성화
@@ -732,6 +772,21 @@ extension AgoraManager: AgoraRtcEngineDelegate {
                 }
             case .starting, .decoding:
                 self.remoteVideoEnabled = true
+                // 비디오가 다시 시작되면 원격 비디오 뷰 재생성
+                if self.remoteVideoView == nil && uid == self.remoteUserId {
+                    print("   ➜ 원격 비디오 재시작 - 뷰 재생성")
+                    let view = UIView()
+                    view.backgroundColor = .black
+                    view.clipsToBounds = true
+                    self.remoteVideoView = view
+                    
+                    let videoCanvas = AgoraRtcVideoCanvas()
+                    videoCanvas.uid = uid
+                    videoCanvas.renderMode = .fit
+                    videoCanvas.view = view
+                    
+                    self.agoraKit?.setupRemoteVideo(videoCanvas)
+                }
                 print("   ➜ 원격 비디오 활성화")
             @unknown default:
                 break

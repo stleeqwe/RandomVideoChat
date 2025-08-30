@@ -36,25 +36,18 @@ struct AgoraVideoView: UIViewRepresentable {
             }
             videoView = agoraManager.localVideoView
             #if DEBUG
-            print("📹 로컬 비디오 뷰 업데이트")
+            print("📹 로컬 비디오 뷰 업데이트 - 카메라: \(agoraManager.isCameraOff ? "OFF" : "ON")")
             #endif
         } else {
             videoView = agoraManager.remoteVideoView
             #if DEBUG
-            print("📹 원격 비디오 뷰 업데이트: \(agoraManager.remoteUserJoined ? "연결됨" : "대기중")")
+            print("📹 원격 비디오 뷰 업데이트: \(agoraManager.remoteUserJoined ? "연결됨" : "대기중"), 비디오: \(agoraManager.remoteVideoEnabled ? "활성" : "비활성")")
             #endif
         }
         
-        // 비디오 뷰가 이미 추가되어 있는지 확인
-        if let existingVideo = videoView, existingVideo.superview == containerView {
-            // 이미 추가되어 있으면 위치만 업데이트
-            existingVideo.frame = containerView.bounds
-            return
-        }
-        
-        // 카메라가 꺼져있는지 확인
+        // 카메라가 꺼져있는지 확인 (원격의 경우 비디오 뷰가 없거나 비활성화 상태)
         let shouldShowProfile = (isLocal && agoraManager.isCameraOff) || 
-                               (!isLocal && agoraManager.remoteUserJoined && !agoraManager.remoteVideoEnabled)
+                               (!isLocal && (videoView == nil || !agoraManager.remoteVideoEnabled))
         
         if let videoView = videoView, !shouldShowProfile {
             // Hide profile if present

@@ -9,11 +9,10 @@ import FirebaseDatabase
 @available(iOS 15.0, *)
 struct VideoCallView: View {
     @State private var isCallActive = false
-    @State private var timeRemaining = 120  // Changed from 5 seconds to 120 seconds (2 minutes)
+    @State private var timeRemaining = 5  // Start at 5 seconds
     @State private var isTimerStarted = false
     @State private var timer: Timer?
     @State private var isMuted = false
-    @State private var isSpeakerOn = false
     @State private var heartCount = 3
     @State private var isCallEnding = false
     @State private var opponentUserId: String = ""
@@ -180,15 +179,6 @@ struct VideoCallView: View {
                                     }
                                 }
                             }
-
-                            // 스피커폰 토글 (하울링 방지: 기본 OFF)
-                            Button(action: {
-                                isSpeakerOn = AgoraManager.shared.toggleSpeaker()
-                            }) {
-                                Image(systemName: isSpeakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                    .font(.system(size: 26))
-                                    .foregroundColor(.white)
-                            }
                         }
                         
                         // 하트 개수 표시
@@ -213,8 +203,8 @@ struct VideoCallView: View {
                 Spacer()
                 
                 HStack {
-                    // 타이머를 분:초 형식으로 표시
-                    Text(formatTime(timeRemaining))
+                    // 타이머를 초 단위로 표시
+                    Text("\(timeRemaining)")
                         .font(.custom("Carter One", size: 36))
                         .foregroundColor(timeRemaining <= 10 ? .red : .white)  // 10초 이하에서 빨간색
                         .monospacedDigit()
@@ -517,9 +507,7 @@ struct VideoCallView: View {
     // MARK: - Video Call Setup and Management
     private func setupVideoCall() {
         setupCameraState()
-        // 하울링 방지: 통화 시작 시 기본 라우트를 수화기로 강제
-        AgoraManager.shared.setSpeakerEnabled(false)
-        isSpeakerOn = false
+        // 오디오 라우팅은 AgoraManager에서 관리 (기본: 수화기)
         
         // 채널명이 있는지 먼저 확인
         guard let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
@@ -693,13 +681,6 @@ struct VideoCallView: View {
 
     func switchCamera() {
         AgoraManager.shared.switchCamera()
-    }
-    
-    // 타이머 포맷팅 함수
-    private func formatTime(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let remainingSeconds = seconds % 60
-        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
     
     // MARK: - Enhanced Report and Block Functions

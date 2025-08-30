@@ -35,7 +35,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>USE_AGORA_TOKEN</key>
-	<true/>
+	<false/>
 	<key>AGORA_TOKEN_ENDPOINT</key>
 	<string>https://your.server.example/agora/token</string>
 </dict>
