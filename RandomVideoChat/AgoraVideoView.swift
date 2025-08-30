@@ -12,6 +12,8 @@ struct AgoraVideoView: UIViewRepresentable {
         
         let view = UIView()
         view.backgroundColor = .black
+        view.clipsToBounds = true  // 뷰 경계 처리
+        view.contentMode = .scaleAspectFit  // 비디오 비율 유지
         
         // 초기 뷰 설정
         updateVideoView(view)
@@ -28,31 +30,40 @@ struct AgoraVideoView: UIViewRepresentable {
         let videoView: UIView?
         
         if isLocal {
+            if agoraManager.localVideoView == nil {
+                // Ensure local preview is prepared when requested
+                agoraManager.ensureLocalPreviewStarted()
+            }
             videoView = agoraManager.localVideoView
             #if DEBUG
-            print("📹 로컬 비디오 뷰 업데이트")
+            print("📹 로컬 비디오 뷰 업데이트 - 카메라: \(agoraManager.isCameraOff ? "OFF" : "ON")")
             #endif
         } else {
             videoView = agoraManager.remoteVideoView
             #if DEBUG
-            print("📹 원격 비디오 뷰 업데이트: \(agoraManager.remoteUserJoined ? "연결됨" : "대기중")")
+            print("📹 원격 비디오 뷰 업데이트: \(agoraManager.remoteUserJoined ? "연결됨" : "대기중"), 비디오: \(agoraManager.remoteVideoEnabled ? "활성" : "비활성")")
             #endif
         }
         
-        // 카메라가 꺼져있는지 확인
-        let shouldShowProfile = (isLocal && agoraManager.isCameraOff) || 
-                               (!isLocal && agoraManager.remoteUserJoined && !agoraManager.remoteVideoEnabled)
+        // 카메라가 꺼져있는지 확인 (원격의 경우 비디오 뷰가 없거나 비활성화 상태)
+        let shouldShowProfile = (isLocal && agoraManager.isCameraOff) ||
+                               (!isLocal && (videoView == nil || !agoraManager.remoteVideoEnabled || agoraManager.remoteCameraMuted))
         
         if let videoView = videoView, !shouldShowProfile {
             // Hide profile if present
             containerView.viewWithTag(profileTag)?.isHidden = true
             if videoView.superview !== containerView {
+                // 기존 비디오 뷰 제거
                 containerView.subviews.forEach { sub in
                     if sub.tag == profileTag { return }
                     sub.removeFromSuperview()
                 }
+                
+                // 비디오 뷰 추가 및 제약 설정
                 containerView.addSubview(videoView)
                 videoView.translatesAutoresizingMaskIntoConstraints = false
+                videoView.contentMode = .scaleAspectFit  // 비디오 비율 유지
+                
                 NSLayoutConstraint.activate([
                     videoView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
                     videoView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
@@ -61,8 +72,11 @@ struct AgoraVideoView: UIViewRepresentable {
                 ])
             }
             videoView.isHidden = false
+            videoView.setNeedsLayout()  // 레이아웃 강제 업데이트
         } else {
             // 비디오가 없거나 카메라가 꺼진 상태일 때 프로필 화면 표시
+            // Ensure any existing video view is hidden to avoid frozen-last-frame peeking
+            videoView?.isHidden = true
             let profileView: UIView
             if let existing = containerView.viewWithTag(profileTag) {
                 profileView = existing

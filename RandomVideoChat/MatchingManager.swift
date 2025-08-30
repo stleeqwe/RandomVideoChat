@@ -14,6 +14,7 @@ class MatchingManager: ObservableObject {
     private var timerHandle: DatabaseHandle?
     private var presenceHandle: DatabaseHandle?
     private var statusEndedHandle: DatabaseHandle?
+    private var cameraStatusHandle: DatabaseHandle?
     
     @Published var isMatching = false
     @Published var matchedUserId: String?
@@ -96,6 +97,16 @@ class MatchingManager: ObservableObject {
             UserManager.shared.loadCurrentUserIfNeeded()
         }
 
+        // Firebase 연결 상태 체크
+        database.reference().child(".info/connected").observe(.value) { snapshot in
+            if let connected = snapshot.value as? Bool {
+                print("🔴🔴🔴 [Firebase] 연결 상태: \(connected ? "✅ 연결됨" : "❌ 연결 끊김")")
+                if !connected {
+                    print("🔴 [Firebase] 연결 끊김 - 네트워크 확인 필요!")
+                }
+            }
+        }
+        
         // 매칭 큐에 데이터 업데이트 (삭제 없이 덮어쓰기)
         let matchingRef = database.reference().child("matching_queue")
         let userRef = matchingRef.child(currentUserId)
@@ -159,10 +170,11 @@ class MatchingManager: ObservableObject {
     
     // MatchingManager.swift의 handleMatchSuccess 함수 내부
     func handleMatchSuccess(matchId: String, channelName: String, matchedUserId: String) {
-        print("✅ 매칭 성공 처리")
-        print("   - 매칭 ID: \(matchId)")
-        print("   - 채널명: \(channelName)")
-        print("   - 상대방 ID: \(matchedUserId)")
+        print("🔴🔴🔴 [매칭성공] ========== handleMatchSuccess ==========")
+        print("🔴 [매칭성공] 매칭 ID: \(matchId)")
+        print("🔴 [매칭성공] 채널명: \(channelName)")
+        print("🔴 [매칭성공] 상대방 ID: \(matchedUserId)")
+        print("🔴 [매칭성공] 현재시간: \(Date())")
         
         // UserDefaults에 저장 (중요!)
         UserDefaults.standard.set(channelName, forKey: "currentChannelName")
@@ -252,8 +264,8 @@ class MatchingManager: ObservableObject {
                 self.isMatched = true
                 self.isMatching = false
                 
-                // 🆕 수정: 큐에서 제거를 더 늦춤 (15초) 또는 제거하지 않음
-                DispatchQueue.main.asyncAfter(deadline: .now() + 15.0) {
+                // 수정: 큐에서 즉시 제거 또는 3초 후 제거 (15초는 너무 김)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     self.removeFromQueue(userId: userId)
                 }
             }
@@ -440,11 +452,16 @@ class MatchingManager: ObservableObject {
         
         // 매칭 ID와 채널명 미리 생성
         let matchId = UUID().uuidString
-        let timestamp = Int(Date().timeIntervalSince1970)
-        let channelName = "ch_\(timestamp)_\(Int.random(in: 1000...9999))"
+        // let timestamp = Int(Date().timeIntervalSince1970)
+        // let channelName = "ch_\(timestamp)_\(Int.random(in: 1000...9999))"
+        
+        // 🔴 디버깅용: 더 간단한 채널명 사용
+        let simpleId = String(matchId.prefix(8).lowercased().filter { $0.isLetter || $0.isNumber })
+        let channelName = "test\(simpleId)"
         
         print("🆔 매칭 ID 생성: \(matchId)")
         print("📺 채널명 생성: \(channelName)")
+        print("🔴🔴🔴 [DEBUG] 간단한 채널명: \(channelName) (길이: \(channelName.count))")
         
         let candidateRef = database.reference().child("matching_queue").child(opponentId)
         
@@ -572,22 +589,74 @@ class MatchingManager: ObservableObject {
             "matching_queue/\(opponentId)/channelName": channelName
         ]
         
-        database.reference().updateChildValues(updates) { error, _ in
+        // 개별 경로로 업데이트 (권한 문제 해결)
+        let dispatchGroup = DispatchGroup()
+        var updateError: Error?
+        
+        // matches 데이터 정의
+        let matchData: [String: Any] = [
+            "status": "active",
+            "user1": currentUserId,
+            "user2": opponentId,
+            "channelName": channelName,
+            "timestamp": ServerValue.timestamp()
+        ]
+        
+        // matches 업데이트
+        dispatchGroup.enter()
+        database.reference().child("matches").child(matchId).setValue(matchData) { error, _ in
+            if let error = error {
+                updateError = error
+                print("❌ matches 업데이트 실패: \(error)")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // 현재 사용자 큐 업데이트
+        dispatchGroup.enter()
+        database.reference().child("matching_queue").child(currentUserId).updateChildValues([
+            "status": "matched",
+            "matchId": matchId,
+            "channelName": channelName
+        ]) { error, _ in
+            if let error = error {
+                updateError = error
+                print("❌ 현재 사용자 큐 업데이트 실패: \(error)")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // 상대방 큐 업데이트
+        dispatchGroup.enter()
+        database.reference().child("matching_queue").child(opponentId).updateChildValues([
+            "status": "matched",
+            "matchId": matchId,
+            "channelName": channelName
+        ]) { error, _ in
+            if let error = error {
+                updateError = error
+                print("❌ 상대방 큐 업데이트 실패: \(error)")
+            }
+            dispatchGroup.leave()
+        }
+        
+        dispatchGroup.notify(queue: .main) {
             // 락 정리
             lockRef.removeValue()
             
-            if let error = error {
+            if let error = updateError {
                 print("❌ 매칭 확정 실패: \(error)")
-                // 롤백 - 큐 상태를 waiting으로 되돌림
-                let rollbackUpdates: [String: Any] = [
-                    "matching_queue/\(currentUserId)/status": "waiting",
-                    "matching_queue/\(currentUserId)/matchId": NSNull(),
-                    "matching_queue/\(currentUserId)/channelName": NSNull(),
-                    "matching_queue/\(opponentId)/status": "waiting",
-                    "matching_queue/\(opponentId)/matchId": NSNull(),
-                    "matching_queue/\(opponentId)/channelName": NSNull()
-                ]
-                self.database.reference().updateChildValues(rollbackUpdates)
+                // 롤백 - 개별 경로로
+                self.database.reference().child("matching_queue").child(currentUserId).updateChildValues([
+                    "status": "waiting",
+                    "matchId": NSNull(),
+                    "channelName": NSNull()
+                ])
+                self.database.reference().child("matching_queue").child(opponentId).updateChildValues([
+                    "status": "waiting",
+                    "matchId": NSNull(),
+                    "channelName": NSNull()
+                ])
             } else {
                 print("✅ 매칭 확정 완료: \(matchId)")
                 // 기존에 구현된 handleMatchSuccess(...) 호출
@@ -689,7 +758,13 @@ class MatchingManager: ObservableObject {
             "matches/\(matchId)/status": "ended"
         ]
         
-        database.reference().updateChildValues(updates) { error, _ in
+        // 개별 경로로 업데이트 (권한 문제 해결)
+        let matchRef = database.reference().child("matches").child(matchId)
+        matchRef.updateChildValues([
+            "endedBy/\(currentUserId)": true,
+            "endedAt": ServerValue.timestamp(),
+            "status": "ended"
+        ]) { error, _ in
             if let error = error {
                 print("❌ 통화 종료 신호 전송 실패: \(error)")
             } else {
@@ -810,6 +885,53 @@ class MatchingManager: ObservableObject {
             }
         print("👀 통화 상태 종료 옵저버 설정 완료 - matchId: \(matchId)")
     }
+
+    // MARK: - Camera Status Signaling
+    func signalCameraStatus(isOn: Bool) {
+        guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId"),
+              let currentUserId = Auth.auth().currentUser?.uid,
+              !matchId.isEmpty else {
+            print("❌ signalCameraStatus: matchId 또는 userId가 없음")
+            return
+        }
+        let ref = database.reference().child("matches").child(matchId).child("cameraStatus")
+        ref.updateChildValues([
+            currentUserId: isOn
+        ]) { error, _ in
+            if let error = error {
+                print("❌ signalCameraStatus 업데이트 실패: \(error)")
+            } else {
+                print("📡 signalCameraStatus 업데이트 성공: isOn=\(isOn)")
+            }
+        }
+    }
+
+    func observeOpponentCameraStatus(opponentId: String, onUpdate: @escaping (Bool) -> Void) {
+        guard let matchId = UserDefaults.standard.string(forKey: "currentMatchId"), !matchId.isEmpty else {
+            print("❌ observeOpponentCameraStatus: matchId가 없음 - 0.3초 후 재시도")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.observeOpponentCameraStatus(opponentId: opponentId, onUpdate: onUpdate)
+            }
+            return
+        }
+
+        // 기존 핸들 제거 후 재설정
+        if let handle = cameraStatusHandle {
+            database.reference().removeObserver(withHandle: handle)
+            cameraStatusHandle = nil
+        }
+        let ref = database.reference().child("matches").child(matchId).child("cameraStatus").child(opponentId)
+        cameraStatusHandle = ref.observe(.value) { snapshot in
+            if let isOn = snapshot.value as? Bool {
+                print("👀 상대 카메라 상태 변경 감지: isOn=\(isOn)")
+                onUpdate(isOn)
+            } else {
+                // 값이 없으면 기본값을 true로 간주 (카메라 on)
+                print("ℹ️ 상대 카메라 상태 없음 -> 기본 on 처리")
+                onUpdate(true)
+            }
+        }
+    }
     
     // MARK: - Observer Cleanup
     func cleanupCallObservers() {
@@ -817,6 +939,7 @@ class MatchingManager: ObservableObject {
         cleanupTimerObserver()
         cleanupPresenceObserver()
         cleanupStatusEndedObserver()
+        cleanupCameraStatusObserver()
         
         print("🧹 통화 관련 옵저버 정리 완료")
     }
@@ -859,5 +982,12 @@ class MatchingManager: ObservableObject {
         cleanupCallObservers()
         
         print("🧹 MatchingManager 모든 옵저버 정리 완료")
+    }
+
+    private func cleanupCameraStatusObserver() {
+        if let handle = cameraStatusHandle {
+            database.reference().removeObserver(withHandle: handle)
+            cameraStatusHandle = nil
+        }
     }
 }

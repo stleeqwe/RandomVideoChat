@@ -9,7 +9,7 @@ import FirebaseDatabase
 @available(iOS 15.0, *)
 struct VideoCallView: View {
     @State private var isCallActive = false
-    @State private var timeRemaining = 5
+    @State private var timeRemaining = 5  // Start at 5 seconds
     @State private var isTimerStarted = false
     @State private var timer: Timer?
     @State private var isMuted = false
@@ -55,7 +55,26 @@ struct VideoCallView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            
+
+            // Connection status banner
+            VStack {
+                if agoraManager.connectionState == .reconnecting {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("Reconnecting…")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color.orange.opacity(0.8))
+                    .cornerRadius(12)
+                    .padding(.top, 50)
+                }
+                Spacer()
+            }
+
             // 상단 좌측 신고/차단 버튼
             VStack {
                 HStack {
@@ -105,6 +124,7 @@ struct VideoCallView: View {
                         // PIP 비디오
                         ZStack {
                             if isCameraOn {
+                                // PIP: 컨테이너를 자연스럽게 채우도록 로컬 렌더 모드(hidden)와 함께 사용
                                 AgoraVideoView(isLocal: true)
                                     .frame(width: 100, height: 140)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -132,9 +152,11 @@ struct VideoCallView: View {
                         HStack(spacing: 12) {
                             // 카메라 아이콘
                             Button(action: {
-                                // 실제 비디오 스트림 제어
+                                // 실제 비디오 스트림 제어 + 상태 신호
                                 let isCameraOff = AgoraManager.shared.toggleCamera()
                                 isCameraOn = !isCameraOff
+                                // Firebase에 카메라 상태 신호 전송
+                                MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
                                 // 카메라 상태를 UserDefaults에 저장
                                 UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
                             }) {
@@ -184,9 +206,10 @@ struct VideoCallView: View {
                 Spacer()
                 
                 HStack {
+                    // 타이머를 초 단위로 표시
                     Text("\(timeRemaining)")
                         .font(.custom("Carter One", size: 36))
-                        .foregroundColor(timeRemaining <= 5 ? .red : .white)
+                        .foregroundColor(timeRemaining <= 10 ? .red : .white)  // 10초 이하에서 빨간색
                         .monospacedDigit()
                         .padding(.leading, 20)
                         .padding(.bottom, 180)
@@ -269,12 +292,16 @@ struct VideoCallView: View {
 
         }
         .onAppear {
+            print("🔴🔴🔴 [VideoCallView] onAppear 호출됨")
             setupVideoCall()
         }
         .onChange(of: agoraManager.remoteUserJoined) { joined in
             if joined && !isTimerStarted {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    startTimer()
+                print("✅ 원격 사용자 참가 감지 - 1초 후 타이머 시작")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if self.agoraManager.remoteUserJoined && !self.isTimerStarted {
+                        self.startTimer()
+                    }
                 }
             }
         }
@@ -382,24 +409,27 @@ struct VideoCallView: View {
                 backgroundStartTime = Date()
                 
                 #if DEBUG
-                print("📱 백그라운드 진입 - 30초 타이머 시작")
+                print("📱 백그라운드 진입 - 타이머 일시중지")
                 #endif
+                
+                // 타이머 일시중지 (백그라운드에서는 타이머 중지)
+                timer?.invalidate()
                 
                 // 기존 타이머가 있다면 취소 (안전장치)
                 backgroundTerminationWorkItem?.cancel()
                 
-                // 30초 후 통화 종료를 예약
+                // 60초 후 통화 종료를 예약 (기존 30초에서 60초로 연장)
                 let workItem = DispatchWorkItem {
                     if self.isBackground && !self.isCallEnding {
                         #if DEBUG
-                        print("📱 백그라운드 30초 경과 - 통화 종료")
+                        print("📱 백그라운드 60초 경과 - 통화 종료")
                         #endif
                         self.cleanupAfterCallEnd(signalEnd: true)
                         self.presentationMode.wrappedValue.dismiss()
                     }
                 }
                 backgroundTerminationWorkItem = workItem
-                DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: workItem)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: workItem)
             }
             
         } else if newPhase == .active {
@@ -418,8 +448,19 @@ struct VideoCallView: View {
                 backgroundTerminationWorkItem?.cancel()
                 backgroundTerminationWorkItem = nil
                 
+                // 타이머 재시작 (포어그라운드 복귀 시)
+                if isTimerStarted && !isCallEnding {
+                    startTimer()
+                }
+                
+                // 비디오 스트림 재활성화 (필요한 경우)
+                if AgoraManager.shared.isInCall {
+                    AgoraManager.shared.agoraKit?.enableLocalVideo(true)
+                    AgoraManager.shared.agoraKit?.startPreview()
+                }
+                
                 #if DEBUG
-                print("📱 백그라운드 타이머 완전 초기화 완료")
+                print("📱 백그라운드 타이머 완전 초기화 및 비디오 재시작 완료")
                 #endif
             }
         }
@@ -469,10 +510,28 @@ struct VideoCallView: View {
     // MARK: - Video Call Setup and Management
     private func setupVideoCall() {
         setupCameraState()
+        // 오디오 라우팅은 AgoraManager에서 관리 (기본: 수화기)
+        
+        // 채널명이 있는지 먼저 확인
+        guard let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
+              !channelName.isEmpty else {
+            print("❌ 채널명이 없어서 통화를 시작할 수 없음")
+            return
+        }
+        
+        // 비디오 통화 시작
         startVideoCall()
+        
+        // 사용자 데이터 설정
         setupUserData()
+        
+        // 상대방 관찰 설정
         setupOpponentObservation()
-        setupCallObservers()
+        
+        // 통화 옵저버 설정 (약간의 지연 후)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.setupCallObservers()
+        }
     }
     
     private func setupCameraState() {
@@ -484,10 +543,12 @@ struct VideoCallView: View {
             UserDefaults.standard.set(true, forKey: "isCameraOn")
         }
         
-        // Agora 카메라 상태도 동기화
+        // Agora 카메라 상태도 동기화 + 상대에 상태 신호 전송
         if !isCameraOn {
             _ = AgoraManager.shared.toggleCamera()
         }
+        // 항상 현재 상태를 신호 (on/off 초기 상태 공유)
+        MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
     }
     
     private func setupUserData() {
@@ -503,8 +564,12 @@ struct VideoCallView: View {
     }
     
     private func setupOpponentObservation() {
-        guard let matchedUserId = MatchingManager.shared.matchedUserId else { return }
+        guard let matchedUserId = MatchingManager.shared.matchedUserId else {
+            print("❌ [VideoCallView] matchedUserId가 없음!")
+            return
+        }
         
+        print("🔴 [VideoCallView] setupOpponentObservation - 상대방: \(matchedUserId)")
         opponentUserId = matchedUserId
         UserManager.shared.addRecentMatch(matchedUserId)
         
@@ -513,6 +578,13 @@ struct VideoCallView: View {
             DispatchQueue.main.async {
                 guard !isCallEnding && !isBackground else { return }
                 endVideoCall()
+            }
+        }
+
+        // 상대방 카메라 상태 관찰 시작
+        MatchingManager.shared.observeOpponentCameraStatus(opponentId: matchedUserId) { isOn in
+            DispatchQueue.main.async {
+                AgoraManager.shared.applyRemoteCameraMuted(!isOn)
             }
         }
     }
@@ -566,21 +638,48 @@ struct VideoCallView: View {
     
     func startVideoCall() {
         isCallActive = true
-        if let channelName = UserDefaults.standard.string(forKey: "currentChannelName") {
+        
+        if let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
+           !channelName.isEmpty {
+            print("📺 비디오 통화 시작: 채널 \(channelName)")
+            
+            // 매칭 큐에서 즉시 제거 (백그라운드에서)
+            if let userId = Auth.auth().currentUser?.uid {
+                MatchingManager.shared.removeFromQueueIfNeeded(userId: userId)
+            }
+            
+            // Agora 통화 시작
             AgoraManager.shared.startCall(channel: channelName)
+        } else {
+            print("❌ 채널명이 없어서 통화를 시작할 수 없음")
         }
     }
 
     func startTimer() {
+        // 기존 타이머가 있다면 먼저 정리
         timer?.invalidate()
+        timer = nil
+        
         isTimerStarted = true
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            if timeRemaining > 0 {
-                timeRemaining -= 1
+        
+        print("⏱ 타이머 시작: \(timeRemaining)초")
+        
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if self.timeRemaining > 0 {
+                self.timeRemaining -= 1
+                
+                // 5초마다 Firebase에 동기화
+                if self.timeRemaining % 5 == 0 {
+                    MatchingManager.shared.updateCallTimer(self.timeRemaining)
+                }
             } else {
-                endVideoCall()
+                print("⏱ 타이머 만료 - 통화 종료")
+                self.endVideoCall()
             }
         }
+        
+        // RunLoop에 추가하여 백그라운드에서도 작동하도록
+        RunLoop.current.add(timer!, forMode: .common)
     }
 
     func endVideoCall() {
