@@ -56,7 +56,26 @@ struct VideoCallView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            
+
+            // Connection status banner
+            VStack {
+                if agoraManager.connectionState == .reconnecting {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("Reconnecting…")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color.orange.opacity(0.8))
+                    .cornerRadius(12)
+                    .padding(.top, 50)
+                }
+                Spacer()
+            }
+
             // 상단 좌측 신고/차단 버튼
             VStack {
                 HStack {

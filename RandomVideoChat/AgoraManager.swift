@@ -33,6 +33,14 @@ class AgoraManager: NSObject, ObservableObject {
     private var isMuted = false
     @Published var isCameraOff = false
     @Published var isSpeakerEnabled = false
+
+    // UI connection state for banners/indicators
+    enum ConnectionStateUI {
+        case connected
+        case reconnecting
+        case disconnected
+    }
+    @Published var connectionState: ConnectionStateUI = .connected
     
     override init() {
         super.init()
@@ -493,6 +501,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         switch state {
         case .disconnected:
             print("   ➜ 연결 끊김")
+            DispatchQueue.main.async { self.connectionState = .disconnected }
             // 네트워크 문제로 끊긴 경우 재연결 시도
             // Check raw values for network-related disconnections
             // Common network issue codes: 8 (network unavailable), 14 (network interrupted)
@@ -502,12 +511,15 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             }
         case .connecting:
             print("   ➜ 연결 중...")
+            DispatchQueue.main.async { self.connectionState = .reconnecting }
         case .connected:
             print("   ➜ 연결됨")
+            DispatchQueue.main.async { self.connectionState = .connected }
             // 연결 성공 시 비디오 품질 재설정
             updateVideoConfigForNetwork()
         case .reconnecting:
             print("   ➜ 재연결 중...")
+            DispatchQueue.main.async { self.connectionState = .reconnecting }
             // 재연결 중 낮은 품질로 전환
             agoraKit?.setVideoEncoderConfiguration(
                 AgoraVideoEncoderConfiguration(
@@ -520,6 +532,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             )
         case .failed:
             print("   ➜ 연결 실패")
+            DispatchQueue.main.async { self.connectionState = .disconnected }
             // 연결 실패 시 재시도
             handleConnectionFailure()
         @unknown default:
