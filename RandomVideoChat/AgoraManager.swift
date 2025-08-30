@@ -1,6 +1,7 @@
 import SwiftUI
 import AgoraRtcKit
 import AVFoundation
+import Combine
 
 class AgoraManager: NSObject, ObservableObject {
     // Network monitoring
@@ -45,6 +46,11 @@ class AgoraManager: NSObject, ObservableObject {
     // Engine lifecycle workaround flag: when true, destroy engine on endCall
     // Keep default as false to maintain singleton engine per SDK guidance
     var destroyEngineOnEndCall: Bool = false
+    
+    // Network path monitoring
+    private var cancellables = Set<AnyCancellable>()
+    private var lastConnectionType: NetworkMonitor.ConnectionType = .unknown
+    private var pathSwitchRestoreWorkItem: DispatchWorkItem?
     
     override init() {
         super.init()
@@ -112,7 +118,10 @@ class AgoraManager: NSObject, ObservableObject {
         
         // 오디오 설정 (중복 제거, 순서 최적화)
         setupAudioConfiguration()
-        
+
+        // Observe path switches like Wi-Fi -> Cellular
+        observeNetworkPathSwitches()
+
         // 로컬 프리뷰는 필요 시에만 설정/시작 (메인 화면 카메라와 충돌 방지)
     }
     
@@ -124,11 +133,11 @@ class AgoraManager: NSObject, ObservableObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             // videoChat 모드로 최적화된 에코 캔슬레이션 활성화
-            // 기본 라우트는 수화기(earpiece)로 설정하여 하울링 최소화
+            // 기본 라우트 스피커 유지
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .videoChat,
-                options: [.allowBluetooth] // 스피커 기본값 제거
+                options: [.allowBluetooth, .defaultToSpeaker]
             )
             // mixWithOthers 제거하여 오디오 피드백 방지
             
@@ -144,9 +153,8 @@ class AgoraManager: NSObject, ObservableObject {
         // Agora 오디오 설정
         agoraKit.enableAudio()
         
-        // 오디오 프로파일 - 에코 캔슬레이션 강화
-        agoraKit.setAudioProfile(.speechStandard, scenario: .gameStreaming)
-        // gameStreaming 시나리오는 더 강력한 에코 캔슬레이션 제공
+        // 오디오 프로파일 - 유지: speechStandard + default scenario
+        agoraKit.setAudioProfile(.speechStandard, scenario: .default)
         
         // 고급 오디오 처리 설정 - 최대 에코 캔슬레이션
         agoraKit.setParameters("{\"che.audio.enable.aec\":true}")
@@ -167,15 +175,15 @@ class AgoraManager: NSObject, ObservableObject {
         agoraKit.setParameters("{\"che.audio.enable.dtx\":true}")  // 불연속 전송 (대역폭 절약)
         agoraKit.setParameters("{\"che.audio.enable.fec\":true}")  // 전방 오류 수정
         
-        // 오디오 볼륨 설정 - 피드백 방지를 위해 더 낮게 조정
-        agoraKit.adjustRecordingSignalVolume(65)  // 추가 감소
-        agoraKit.adjustPlaybackSignalVolume(65)   // 스피커 사용 시 하울링 억제
-        agoraKit.adjustAudioMixingPlayoutVolume(60)
+        // 오디오 볼륨 설정 (보수적)
+        agoraKit.adjustRecordingSignalVolume(70)
+        agoraKit.adjustPlaybackSignalVolume(75)
+        agoraKit.adjustAudioMixingPlayoutVolume(70)
         
-        // 기본 오디오 라우트: 수화기(earpiece)
-        agoraKit.setDefaultAudioRouteToSpeakerphone(false)
-        agoraKit.setEnableSpeakerphone(false)
-        isSpeakerEnabled = false
+        // 기본 오디오 라우트: 스피커폰 유지
+        agoraKit.setDefaultAudioRouteToSpeakerphone(true)
+        agoraKit.setEnableSpeakerphone(true)
+        isSpeakerEnabled = true
         
         print("✅ 고급 오디오 설정 완료")
     }
@@ -272,7 +280,18 @@ class AgoraManager: NSObject, ObservableObject {
         engine.setParameters("{\"che.network.adaptive_bitrate_adjust\":true}")  // 적응형 비트레이트
         engine.setParameters("{\"rtc.network.aggressive_report\":true}")  // 공격적 네트워크 리포팅
         engine.setParameters("{\"rtc.network.enable_ice_renomination\":true}")  // ICE 재지명 활성화
-        
+
+        // Token-based auth: fetch before join if enabled
+        if TokenProvider.shared.isEnabled() {
+            TokenProvider.shared.fetchToken(channel: channel, uid: 0) { [weak self] token in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    self.joinChannel(channel: channel, token: token, retryCount: retryCount)
+                }
+            }
+            return
+        }
+
         // 채널 옵션 설정 (수정됨)
         let options = AgoraRtcChannelMediaOptions()
         options.publishCameraTrack = true
@@ -310,6 +329,40 @@ class AgoraManager: NSObject, ObservableObject {
             }
         }
         
+        if result != 0 {
+            print("❌ joinChannel 실패: \(result)")
+            handleJoinError(result, channel: channel, retryCount: retryCount)
+        } else {
+            print("✅ joinChannel 호출 성공")
+        }
+    }
+    
+    private func joinChannel(channel: String, token: String?, retryCount: Int) {
+        guard let engine = agoraKit else { return }
+        let options = AgoraRtcChannelMediaOptions()
+        options.publishCameraTrack = true
+        options.publishMicrophoneTrack = true
+        options.clientRoleType = .broadcaster
+        options.autoSubscribeVideo = true
+        options.autoSubscribeAudio = true
+        options.channelProfile = .communication
+
+        print("🎯 joinChannel 호출 (token=\(token != nil))")
+
+        let result = engine.joinChannel(byToken: token, channelId: channel, uid: 0, mediaOptions: options) { [weak self] channel, uid, elapsed in
+            print("✅ 채널 참가 성공: \(channel), uid: \(uid)")
+            self?.localUserId = uid
+            DispatchQueue.main.async {
+                self?.isInCall = true
+                self?.agoraKit?.setRemoteDefaultVideoStreamType(.low)
+                let delay = self?.networkMonitor.connectionType == .wifi ? 2.0 : 3.0
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    if self?.networkMonitor.networkQuality == .excellent || self?.networkMonitor.networkQuality == .good {
+                        self?.agoraKit?.setRemoteDefaultVideoStreamType(.high)
+                    }
+                }
+            }
+        }
         if result != 0 {
             print("❌ joinChannel 실패: \(result)")
             handleJoinError(result, channel: channel, retryCount: retryCount)
@@ -442,6 +495,36 @@ class AgoraManager: NSObject, ObservableObject {
     func toggleSpeaker() -> Bool {
         setSpeakerEnabled(!isSpeakerEnabled)
         return isSpeakerEnabled
+    }
+
+    // Observe connection type transitions and respond
+    private func observeNetworkPathSwitches() {
+        lastConnectionType = networkMonitor.connectionType
+        networkMonitor.$connectionType
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] newType in
+                guard let self = self else { return }
+                let old = self.lastConnectionType
+                self.lastConnectionType = newType
+                if old == .wifi && newType == .cellular {
+                    self.handleWifiToCellularSwitch()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleWifiToCellularSwitch() {
+        guard let engine = agoraKit, remoteUserId != 0 else { return }
+        print("📡 Path switch detected (Wi‑Fi → Cellular): downgrade remote stream for 10s")
+        engine.setRemoteVideoStream(remoteUserId, type: .low)
+        pathSwitchRestoreWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self, let engine = self.agoraKit, self.remoteUserId != 0 else { return }
+            print("📡 Restoring remote stream to HIGH after cooldown")
+            engine.setRemoteVideoStream(self.remoteUserId, type: .high)
+        }
+        pathSwitchRestoreWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0, execute: work)
     }
     
     // MARK: - 카메라 전환
@@ -705,6 +788,23 @@ extension AgoraManager: AgoraRtcEngineDelegate {
             // 원격의 품질도 모니터에 반영
             NetworkQualityMonitor.shared.update(tx: txQuality, rx: rxQuality)
             applyRemoteStreamType(for: uid, quality: NetworkQualityMonitor.shared.currentQuality)
+        }
+    }
+
+    // Token about to expire -> refresh
+    func rtcEngine(_ engine: AgoraRtcEngineKit, tokenPrivilegeWillExpire token: String) {
+        print("⏳ Agora token will expire soon — refreshing…")
+        let channel = self.channelName
+        let uid = self.localUserId
+        TokenProvider.shared.fetchToken(channel: channel, uid: uid) { newToken in
+            guard let newToken = newToken, !newToken.isEmpty else {
+                print("⚠️ Token refresh returned empty token; keeping current")
+                return
+            }
+            DispatchQueue.main.async {
+                engine.renewToken(newToken)
+                print("🔁 Agora token renewed")
+            }
         }
     }
 
