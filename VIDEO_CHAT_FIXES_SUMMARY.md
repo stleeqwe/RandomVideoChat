@@ -7,13 +7,11 @@
 **Root Cause**: Microphone picking up speaker output and re-amplifying it
 
 **Solutions Implemented**:
-- Changed audio session mode from `.voiceChat` to `.videoChat` for better echo cancellation
-- Removed `.mixWithOthers` option to prevent audio mixing conflicts  
-- Enhanced echo cancellation with AEC3 algorithm and non-linear processing
-- Reduced recording volume from 85 to 70 (prevents feedback)
-- Reduced playback volume from 90 to 80
-- Added mixing volume limit at 70
-- Changed audio scenario to `.gameStreaming` for stronger echo suppression
+- Route audio to earpiece by default (speaker OFF) to minimize acoustic feedback
+- Added in-call Speaker toggle in UI to opt-in to loudspeaker when needed
+- Lowered playback and recording gain further (65/65) and mixing to 60
+- Enabled advanced AEC (AEC3), noise suppression, AGC, VAD, and howling control
+- Kept AVAudioSession mode `.videoChat` with `.playAndRecord` and `.allowBluetooth`
 
 ### 2. ✅ Remote Video Visibility Fix
 **Problem**: Remote user's video not showing when chat starts

@@ -32,6 +32,7 @@ class AgoraManager: NSObject, ObservableObject {
     // 오디오/비디오 상태
     private var isMuted = false
     @Published var isCameraOff = false
+    @Published var isSpeakerEnabled = false
     
     override init() {
         super.init()
@@ -96,9 +97,12 @@ class AgoraManager: NSObject, ObservableObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             // videoChat 모드로 최적화된 에코 캔슬레이션 활성화
-            try audioSession.setCategory(.playAndRecord, 
-                                        mode: .videoChat,  // 비디오 채팅용 에코 캔슬레이션
-                                        options: [.defaultToSpeaker, .allowBluetooth])
+            // 기본 라우트는 수화기(earpiece)로 설정하여 하울링 최소화
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .videoChat,
+                options: [.allowBluetooth] // 스피커 기본값 제거
+            )
             // mixWithOthers 제거하여 오디오 피드백 방지
             
             // 샘플레이트와 버퍼 크기 최적화
@@ -137,13 +141,14 @@ class AgoraManager: NSObject, ObservableObject {
         agoraKit.setParameters("{\"che.audio.enable.fec\":true}")  // 전방 오류 수정
         
         // 오디오 볼륨 설정 - 피드백 방지를 위해 더 낮게 조정
-        agoraKit.adjustRecordingSignalVolume(70)  // 85에서 70으로 감소 (하울링 방지)
-        agoraKit.adjustPlaybackSignalVolume(80)   // 90에서 80으로 감소
-        agoraKit.adjustAudioMixingPlayoutVolume(70)  // 믹싱 볼륨도 제한
+        agoraKit.adjustRecordingSignalVolume(65)  // 추가 감소
+        agoraKit.adjustPlaybackSignalVolume(65)   // 스피커 사용 시 하울링 억제
+        agoraKit.adjustAudioMixingPlayoutVolume(60)
         
-        // 스피커폰 기본 설정
-        agoraKit.setDefaultAudioRouteToSpeakerphone(true)
-        agoraKit.setEnableSpeakerphone(true)
+        // 기본 오디오 라우트: 수화기(earpiece)
+        agoraKit.setDefaultAudioRouteToSpeakerphone(false)
+        agoraKit.setEnableSpeakerphone(false)
+        isSpeakerEnabled = false
         
         print("✅ 고급 오디오 설정 완료")
     }
@@ -357,6 +362,18 @@ class AgoraManager: NSObject, ObservableObject {
         agoraKit?.muteLocalAudioStream(isMuted)
         print("🎤 음소거: \(isMuted)")
         return isMuted
+    }
+    
+    // MARK: - 스피커 라우팅 제어
+    func setSpeakerEnabled(_ enabled: Bool) {
+        isSpeakerEnabled = enabled
+        agoraKit?.setEnableSpeakerphone(enabled)
+        print("🔊 스피커폰: \(enabled ? "ON" : "OFF")")
+    }
+    
+    func toggleSpeaker() -> Bool {
+        setSpeakerEnabled(!isSpeakerEnabled)
+        return isSpeakerEnabled
     }
     
     // MARK: - 카메라 전환

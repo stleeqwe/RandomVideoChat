@@ -13,6 +13,7 @@ struct VideoCallView: View {
     @State private var isTimerStarted = false
     @State private var timer: Timer?
     @State private var isMuted = false
+    @State private var isSpeakerOn = false
     @State private var heartCount = 3
     @State private var isCallEnding = false
     @State private var opponentUserId: String = ""
@@ -159,6 +160,15 @@ struct VideoCallView: View {
                                             .offset(x: 0, y: -2)
                                     }
                                 }
+                            }
+
+                            // 스피커폰 토글 (하울링 방지: 기본 OFF)
+                            Button(action: {
+                                isSpeakerOn = AgoraManager.shared.toggleSpeaker()
+                            }) {
+                                Image(systemName: isSpeakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                                    .font(.system(size: 26))
+                                    .foregroundColor(.white)
                             }
                         }
                         
@@ -488,6 +498,9 @@ struct VideoCallView: View {
     // MARK: - Video Call Setup and Management
     private func setupVideoCall() {
         setupCameraState()
+        // 하울링 방지: 통화 시작 시 기본 라우트를 수화기로 강제
+        AgoraManager.shared.setSpeakerEnabled(false)
+        isSpeakerOn = false
         
         // 채널명이 있는지 먼저 확인
         guard let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
