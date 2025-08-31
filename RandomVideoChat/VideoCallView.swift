@@ -305,6 +305,12 @@ struct VideoCallView: View {
                 }
             }
         }
+        // After join success, broadcast our current camera overlay state once
+        .onChange(of: agoraManager.isInCall) { inCall in
+            if inCall {
+                MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
             handleAppTermination()
         }
@@ -543,12 +549,10 @@ struct VideoCallView: View {
             UserDefaults.standard.set(true, forKey: "isCameraOn")
         }
         
-        // Agora 카메라 상태도 동기화 + 상대에 상태 신호 전송
+        // Agora 카메라 상태도 동기화 (오버레이만 적용)
         if !isCameraOn {
             _ = AgoraManager.shared.toggleCamera()
         }
-        // 항상 현재 상태를 신호 (on/off 초기 상태 공유)
-        MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
     }
     
     private func setupUserData() {

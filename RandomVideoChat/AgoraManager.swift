@@ -267,9 +267,9 @@ class AgoraManager: NSObject, ObservableObject {
     func applyRemoteCameraMuted(_ muted: Bool) {
         // Overlay-only behavior: keep receiving stream/canvas intact and toggle UI state only
         DispatchQueue.main.async {
+            // Only apply overlay after we actually know a remote user (prevents premature overlay)
+            guard self.remoteUserId != 0 else { return }
             self.remoteCameraMuted = muted
-            // Do not force remoteVideoEnabled false; that reflects actual SDK state.
-            // Keep canvas/view attached so stream stays alive.
             if muted {
                 print("🙈 Remote camera muted (overlay only; stream continues)")
             } else {
@@ -731,8 +731,25 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         case .failed:
             print("   ➜ 연결 실패")
             DispatchQueue.main.async { self.connectionState = .disconnected }
-            // 연결 실패 시 재시도
-            handleConnectionFailure()
+            // If failure due to invalid/expired token, fetch and rejoin with token
+            if reason.rawValue == 8 { // likely invalid/expired token
+                let savedChannel = self.channelName
+                if !savedChannel.isEmpty {
+                    if TokenProvider.shared.isEnabled() {
+                        TokenProvider.shared.fetchToken(channel: savedChannel, uid: 0) { [weak self] token in
+                            guard let self = self else { return }
+                            DispatchQueue.main.async {
+                                self.joinChannel(channel: savedChannel, token: token, retryCount: 0)
+                            }
+                        }
+                    } else {
+                        print("⚠️ Connection failed due to token. Enable USE_AGORA_TOKEN and configure AGORA_TOKEN_ENDPOINT.")
+                    }
+                }
+            } else {
+                // Generic failure: attempt controlled rejoin
+                handleConnectionFailure()
+            }
         @unknown default:
             break
         }
@@ -753,13 +770,26 @@ extension AgoraManager: AgoraRtcEngineDelegate {
     // 연결 실패 처리
     private func handleConnectionFailure() {
         print("❌ 연결 실패 - 재시도 준비")
-        // 채널 정보가 있으면 재접속 시도
-        if !channelName.isEmpty {
-            endCall()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-                guard let self = self else { return }
-                if self.networkMonitor.isConnected {
-                    self.startCall(channel: self.channelName)
+        // Keep current channel and attempt a controlled rejoin without full teardown
+        let savedChannel = self.channelName
+        guard !savedChannel.isEmpty else { return }
+
+        // Leave channel if partially joined/connecting
+        agoraKit?.leaveChannel(nil)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self = self else { return }
+            if self.networkMonitor.isConnected {
+                // If token is enabled, fetch a fresh one before rejoin
+                if TokenProvider.shared.isEnabled() {
+                    TokenProvider.shared.fetchToken(channel: savedChannel, uid: 0) { [weak self] token in
+                        guard let self = self else { return }
+                        DispatchQueue.main.async {
+                            self.joinChannel(channel: savedChannel, token: token, retryCount: 0)
+                        }
+                    }
+                } else {
+                    self.startCall(channel: savedChannel)
                 }
             }
         }
