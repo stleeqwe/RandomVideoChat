@@ -126,70 +126,108 @@ class AgoraManager: NSObject, ObservableObject {
         // 로컬 프리뷰는 필요 시에만 설정/시작 (메인 화면 카메라와 충돌 방지)
     }
     
-    // MARK: - 오디오 설정 (새로 추가)
+    // MARK: - 오디오 설정 (고품질 최적화 버전)
     private func setupAudioConfiguration() {
         guard let agoraKit = agoraKit else { return }
         
-        // 오디오 세션 설정 (iOS) - 강화된 에코 캔슬레이션
+        // ========== iOS 오디오 세션 최적화 ==========
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            // videoChat 모드로 최적화된 에코 캔슬레이션 활성화
-            // 기본 라우트를 수화기로 설정 (하울링 방지)
+            
+            // videoChat 모드 + 최적화 옵션
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .videoChat,
-                options: [.allowBluetooth]  // defaultToSpeaker 제거
+                options: [
+                    .allowBluetooth,
+                    .allowBluetoothA2DP,  // 고품질 블루투스 오디오
+                    .allowAirPlay         // AirPlay 지원
+                ]
             )
-            // mixWithOthers 제거하여 오디오 피드백 방지
             
-            // 샘플레이트와 버퍼 크기 최적화
+            // 48kHz 고품질 샘플레이트
             try audioSession.setPreferredSampleRate(48000)
-            try audioSession.setPreferredIOBufferDuration(0.005) // 5ms 버퍼로 지연 최소화
+            
+            // 초저지연 버퍼 (5ms → 10ms로 안정성 개선)
+            try audioSession.setPreferredIOBufferDuration(0.01)
+            
+            // 입력 채널 수 설정 (스테레오)
+            try audioSession.setPreferredInputNumberOfChannels(2)
+            
             try audioSession.setActive(true)
-            print("✅ iOS 오디오 세션 설정 완료 (에코 캔슬레이션 강화)")
+            print("✅ iOS 오디오 세션 고품질 설정 완료")
         } catch {
             print("❌ iOS 오디오 세션 설정 실패: \(error)")
         }
         
-        // Agora 오디오 설정
+        // ========== Agora 고품질 프로필 설정 ==========
         agoraKit.enableAudio()
         
-        // 오디오 프로파일 - 에코 캔슬레이션 최적화
-        agoraKit.setAudioProfile(.speechStandard, scenario: .default)
+        // 🔥 핵심 변경: 고품질 스테레오 + 채팅룸 엔터테인먼트 시나리오
+        agoraKit.setAudioProfile(
+            .musicHighQualityStereo,    // 48kHz, 스테레오, 128kbps
+            scenario: .chatRoomEntertainment  // 대화형 엔터테인먼트 최적화
+        )
         
-        // 고급 오디오 처리 설정 - 최대 에코 캔슬레이션
-        agoraKit.setParameters("{\"che.audio.enable.aec\":true}")
-        agoraKit.setParameters("{\"che.audio.enable.aec3\":true}")  // AEC3 알고리즘 사용
-        agoraKit.setParameters("{\"che.audio.aec.nlp_enabled\":true}")  // 비선형 처리 활성화
-        agoraKit.setParameters("{\"che.audio.aec.delay_agnostic_enabled\":true}")  // 지연 무관 AEC
-        agoraKit.setParameters("{\"che.audio.aec.mode\":2}")  // 공격적 에코 캔슬레이션 모드
+        // ========== 고급 에코 제거 설정 (강화) ==========
+        // AEC3 알고리즘 (최신 에코 제거)
+        agoraKit.setParameters("{\"che.audio.enable.aec3\":true}")
+        agoraKit.setParameters("{\"che.audio.aec.nlp_enabled\":true}")
+        agoraKit.setParameters("{\"che.audio.aec.delay_agnostic_enabled\":true}")
+        
+        // 적응형 에코 제거 모드
+        agoraKit.setParameters("{\"che.audio.aec.mode\":2}")  // 공격적 모드
+        agoraKit.setParameters("{\"che.audio.aec.comfort_noise\":true}")  // 편안한 배경음
+        
+        // ========== 노이즈 억제 (AI 기반) ==========
         agoraKit.setParameters("{\"che.audio.enable.ns\":true}")
-        agoraKit.setParameters("{\"che.audio.enable.ns.mode\":2}")  // 더 강력한 노이즈 억제
-        agoraKit.setParameters("{\"che.audio.enable.agc\":true}")
-        agoraKit.setParameters("{\"che.audio.agc.mode\":2}")  // 적응형 AGC
-        agoraKit.setParameters("{\"che.audio.agc.target_level_dbov\":3}")  // AGC 타겟 레벨 (더 큰 소리)
-        agoraKit.setParameters("{\"che.audio.agc.compression_gain\":18}")  // AGC 압축 게인 증가
-        
-        // 오디오 품질 향상 설정
+        agoraKit.setParameters("{\"che.audio.enable.ns.mode\":2}")  // AI 노이즈 억제
         agoraKit.setParameters("{\"che.audio.ans.mode\":2}")  // 적응형 노이즈 억제
         agoraKit.setParameters("{\"che.audio.enable.vad\":true}")  // 음성 활동 감지
-        agoraKit.setParameters("{\"che.audio.howling.control\":true}")  // 하울링 제어
         
-        // 네트워크 적응형 설정
-        agoraKit.setParameters("{\"che.audio.enable.dtx\":true}")  // 불연속 전송 (대역폭 절약)
-        agoraKit.setParameters("{\"che.audio.enable.fec\":true}")  // 전방 오류 수정
+        // ========== 자동 이득 제어 (AGC) 최적화 ==========
+        agoraKit.setParameters("{\"che.audio.enable.agc\":true}")
+        agoraKit.setParameters("{\"che.audio.agc.mode\":2}")  // 적응형 디지털 모드
+        agoraKit.setParameters("{\"che.audio.agc.target_level_dbov\":3}")
+        agoraKit.setParameters("{\"che.audio.agc.compression_gain\":24}")  // 증가된 게인
         
-        // 오디오 볼륨 설정 (적절한 볼륨으로 조정)
-        agoraKit.adjustRecordingSignalVolume(85)  // 마이크 입력 볼륨 증가
-        agoraKit.adjustPlaybackSignalVolume(90)   // 스피커 출력 볼륨 증가
-        agoraKit.adjustAudioMixingPlayoutVolume(85)  // 오디오 믹싱 볼륨
+        // ========== 하울링 방지 최적화 ==========
+        agoraKit.setParameters("{\"che.audio.howling.control\":true}")
+        agoraKit.setParameters("{\"che.audio.enable.aec.external_loopback\":true}")
         
-        // 기본 오디오 라우트: 수화기 (하울링 방지)
-        agoraKit.setDefaultAudioRouteToSpeakerphone(false)
+        // ========== 고품질 코덱 설정 ==========
+        agoraKit.setParameters("{\"che.audio.codec.complexity\":10}")  // 최고 품질
+        agoraKit.setParameters("{\"che.audio.enable.md\":false}")  // 음악 감지 비활성화
+        
+        // ========== 3D 오디오 및 공간감 ==========
+        agoraKit.setParameters("{\"che.audio.enable.3d\":true}")
+        agoraKit.setParameters("{\"che.audio.3d.enable.speex\":true}")
+        
+        // ========== 네트워크 적응 설정 ==========
+        agoraKit.setParameters("{\"che.audio.enable.dtx\":true}")
+        agoraKit.setParameters("{\"che.audio.enable.fec\":true}")
+        agoraKit.setParameters("{\"che.audio.uplink_aec_dump\":true}")
+        
+        // ========== 볼륨 최적화 (동적 조절) ==========
+        agoraKit.adjustRecordingSignalVolume(100)  // 마이크 기본 100%
+        agoraKit.adjustPlaybackSignalVolume(100)   // 스피커 기본 100%
+        
+        // ========== 오디오 라우팅 초기 설정 ==========
+        agoraKit.setDefaultAudioRouteToSpeakerphone(false)  // 이어피스 기본
         agoraKit.setEnableSpeakerphone(false)
         isSpeakerEnabled = false
         
-        print("✅ 고급 오디오 설정 완료")
+        print("✅ Agora 고품질 오디오 설정 완료")
+    }
+
+    // MARK: - 오디오 볼륨 인디케이터 활성화
+    func enableVolumeIndication() {
+        // 200ms 간격으로 볼륨 리포트
+        agoraKit?.enableAudioVolumeIndication(
+            interval: 200,
+            smooth: 3,
+            reportVad: true
+        )
     }
     
     // MARK: - 로컬 비디오 설정

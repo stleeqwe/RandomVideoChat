@@ -47,6 +47,10 @@
 		88ABCD001122334455667701 /* HeartPurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667700 /* HeartPurchaseView.swift */; };
 		88ABCD001122334455667703 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667702 /* StoreKitManager.swift */; };
 		88ABCD001122334455667706 /* DailyRewardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667704 /* DailyRewardManager.swift */; };
+		88NET00012F0000001234567 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88NET00002F0000001234567 /* NetworkMonitor.swift */; };
+		88NQM00012F0000001234567 /* NetworkQualityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */; };
+		88TOK00012F0000001234567 /* TokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88TOK00002F0000001234567 /* TokenProvider.swift */; };
+		88CAM00012F0000001234567 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CAM00002F0000001234567 /* CameraManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -104,6 +108,10 @@
 		88ABCD001122334455667700 /* HeartPurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartPurchaseView.swift; sourceTree = "<group>"; };
 		88ABCD001122334455667702 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		88ABCD001122334455667704 /* DailyRewardManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRewardManager.swift; sourceTree = "<group>"; };
+		88NET00002F0000001234567 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityMonitor.swift; sourceTree = "<group>"; };
+		88TOK00002F0000001234567 /* TokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenProvider.swift; sourceTree = "<group>"; };
+		88CAM00002F0000001234567 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -193,6 +201,10 @@
 				88ABCD001122334455667700 /* HeartPurchaseView.swift */,
 				88ABCD001122334455667702 /* StoreKitManager.swift */,
 				88ABCD001122334455667704 /* DailyRewardManager.swift */,
+				88NET00002F0000001234567 /* NetworkMonitor.swift */,
+				88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */,
+				88TOK00002F0000001234567 /* TokenProvider.swift */,
+				88CAM00002F0000001234567 /* CameraManager.swift */,
 			);
 			path = RandomVideoChat;
 			sourceTree = "<group>";
@@ -393,6 +405,10 @@
 				88ABCD001122334455667701 /* HeartPurchaseView.swift in Sources */,
 				88ABCD001122334455667703 /* StoreKitManager.swift in Sources */,
 				88ABCD001122334455667706 /* DailyRewardManager.swift in Sources */,
+				88NET00012F0000001234567 /* NetworkMonitor.swift in Sources */,
+				88NQM00012F0000001234567 /* NetworkQualityMonitor.swift in Sources */,
+				88TOK00012F0000001234567 /* TokenProvider.swift in Sources */,
+				88CAM00012F0000001234567 /* CameraManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
