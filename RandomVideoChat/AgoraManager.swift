@@ -57,6 +57,17 @@ class AgoraManager: NSObject, ObservableObject {
         super.init()
         setupAgoraEngine()
     }
+
+    // Allocate a stable local UID for Agora joins (persists across sessions on this device)
+    private func obtainLocalUid() -> UInt {
+        if localUserId != 0 { return localUserId }
+        if let stored = UserDefaults.standard.object(forKey: "agoraLocalUid") as? Int, stored > 0 {
+            return UInt(stored)
+        }
+        let generated: Int = Int.random(in: 1...(Int(UInt32.max) - 1))
+        UserDefaults.standard.set(generated, forKey: "agoraLocalUid")
+        return UInt(generated)
+    }
     
     // MARK: - Agora 엔진 설정 (수정됨)
     private func setupAgoraEngine() {
@@ -338,12 +349,13 @@ class AgoraManager: NSObject, ObservableObject {
         engine.setParameters("{\"rtc.network.aggressive_report\":true}")  // 공격적 네트워크 리포팅
         engine.setParameters("{\"rtc.network.enable_ice_renomination\":true}")  // ICE 재지명 활성화
 
-        // Token-based auth: fetch before join if enabled
+        // Token-based auth: fetch before join if enabled (use stable UID)
+        let uidToUse = obtainLocalUid()
         if TokenProvider.shared.isEnabled() {
-            TokenProvider.shared.fetchToken(channel: channel, uid: 0) { [weak self] token in
+            TokenProvider.shared.fetchToken(channel: channel, uid: uidToUse) { [weak self] token in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
-                    self.joinChannel(channel: channel, token: token, retryCount: retryCount)
+                    self.joinChannel(channel: channel, token: token, retryCount: retryCount, uid: uidToUse)
                 }
             }
             return
@@ -363,7 +375,7 @@ class AgoraManager: NSObject, ObservableObject {
         let result = engine.joinChannel(
             byToken: nil,
             channelId: channel,
-            uid: 0,
+            uid: uidToUse,
             mediaOptions: options
         ) { [weak self] channel, uid, elapsed in
             print("✅ 채널 참가 성공: \(channel), uid: \(uid)")
@@ -394,7 +406,7 @@ class AgoraManager: NSObject, ObservableObject {
         }
     }
     
-    private func joinChannel(channel: String, token: String?, retryCount: Int) {
+    private func joinChannel(channel: String, token: String?, retryCount: Int, uid: UInt) {
         guard let engine = agoraKit else { return }
         let options = AgoraRtcChannelMediaOptions()
         options.publishCameraTrack = true
@@ -406,7 +418,7 @@ class AgoraManager: NSObject, ObservableObject {
 
         print("🎯 joinChannel 호출 (token=\(token != nil))")
 
-        let result = engine.joinChannel(byToken: token, channelId: channel, uid: 0, mediaOptions: options) { [weak self] channel, uid, elapsed in
+        let result = engine.joinChannel(byToken: token, channelId: channel, uid: uid, mediaOptions: options) { [weak self] channel, uid, elapsed in
             print("✅ 채널 참가 성공: \(channel), uid: \(uid)")
             self?.localUserId = uid
             DispatchQueue.main.async {
