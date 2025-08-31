@@ -10,7 +10,8 @@ final class TokenProvider {
     private init() {
         session = URLSession(configuration: .default)
         endpoint = Bundle.main.object(forInfoDictionaryKey: "AGORA_TOKEN_ENDPOINT") as? String
-        useToken = (Bundle.main.object(forInfoDictionaryKey: "USE_AGORA_TOKEN") as? Bool) ?? true
+        // Default to false if not provided to avoid accidental token enforcement
+        useToken = (Bundle.main.object(forInfoDictionaryKey: "USE_AGORA_TOKEN") as? Bool) ?? false
     }
 
     func isEnabled() -> Bool { useToken }
@@ -51,4 +52,3 @@ final class TokenProvider {
         task.resume()
     }
 }
-

@@ -134,25 +134,23 @@ class AgoraManager: NSObject, ObservableObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             
-            // videoChat 모드 + 최적화 옵션
+            // videoChat 모드 + 최적화 옵션 (호환성 우선)
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .videoChat,
                 options: [
-                    .allowBluetooth,
-                    .allowBluetoothA2DP,  // 고품질 블루투스 오디오
-                    .allowAirPlay         // AirPlay 지원
+                    .allowBluetooth
                 ]
             )
             
-            // 48kHz 고품질 샘플레이트
-            try audioSession.setPreferredSampleRate(48000)
+            // 48kHz 고품질 샘플레이트 (best-effort)
+            _ = try? audioSession.setPreferredSampleRate(48000)
             
-            // 초저지연 버퍼 (5ms → 10ms로 안정성 개선)
-            try audioSession.setPreferredIOBufferDuration(0.01)
+            // 저지연 버퍼 (best-effort)
+            _ = try? audioSession.setPreferredIOBufferDuration(0.01)
             
-            // 입력 채널 수 설정 (스테레오)
-            try audioSession.setPreferredInputNumberOfChannels(2)
+            // 입력 채널 수 설정 (스테레오) — 일부 기기에서 실패할 수 있으므로 best-effort
+            _ = try? audioSession.setPreferredInputNumberOfChannels(2)
             
             try audioSession.setActive(true)
             print("✅ iOS 오디오 세션 고품질 설정 완료")
@@ -164,9 +162,10 @@ class AgoraManager: NSObject, ObservableObject {
         agoraKit.enableAudio()
         
         // 🔥 핵심 변경: 고품질 스테레오 + 채팅룸 엔터테인먼트 시나리오
+        // Use a widely supported scenario to maximize compatibility across SDK versions
         agoraKit.setAudioProfile(
             .musicHighQualityStereo,    // 48kHz, 스테레오, 128kbps
-            scenario: .chatRoomEntertainment  // 대화형 엔터테인먼트 최적화
+            scenario: .default
         )
         
         // ========== 고급 에코 제거 설정 (강화) ==========
@@ -224,7 +223,7 @@ class AgoraManager: NSObject, ObservableObject {
     func enableVolumeIndication() {
         // 200ms 간격으로 볼륨 리포트
         agoraKit?.enableAudioVolumeIndication(
-            interval: 200,
+            200,
             smooth: 3,
             reportVad: true
         )
@@ -988,15 +987,8 @@ extension AgoraManager {
         videoConfig.degradationPreference = .balanced
         agoraKit.setVideoEncoderConfiguration(videoConfig)
         
-        // 오디오 전용 모드 체크
-        if networkMonitor.shouldUseAudioOnly() {
-            print("⚠️ Poor network detected - switching to audio only mode")
-            agoraKit.muteLocalVideoStream(true)
-            agoraKit.enableLocalVideo(false)
-        } else {
-            agoraKit.muteLocalVideoStream(false)
-            agoraKit.enableLocalVideo(true)
-        }
+        // 오디오 전용 모드 체크 (오버레이 정책 준수: 스트림 중단 금지)
+        // 매우 나쁜 네트워크에서도 퍼블리시 유지하고 인코더만 낮춤
         
         print("📶 Video config updated for \(networkMonitor.connectionType.description): \(config.bitrate)kbps, \(config.frameRate)fps")
     }
@@ -1016,9 +1008,10 @@ extension AgoraManager {
             agoraKit.setParameters("{\"che.video.lowBitRateStreamParameter\":{\"width\":320,\"height\":240,\"frameRate\":15,\"bitRate\":200}}")
             agoraKit.setRemoteDefaultVideoStreamType(.low)
         case 5...6: // Very Bad to Down
-            // 최저 품질 또는 오디오 전용
-            agoraKit.muteLocalVideoStream(true)
-            print("⚠️ Network too poor - video disabled")
+            // 최저 품질 유지 (오디오 전용 전환 금지)
+            agoraKit.setParameters("{\"che.video.lowBitRateStreamParameter\":{\"width\":160,\"height\":120,\"frameRate\":10,\"bitRate\":120}}")
+            agoraKit.setRemoteDefaultVideoStreamType(.low)
+            print("⚠️ Network very poor - forcing lowest video profile, keeping stream alive")
         default:
             break
         }
