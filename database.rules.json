@@ -1,20 +1,117 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
+    ".read": false,
+    ".write": false,
+
     "matching_queue": {
       ".indexOn": ["bucket", "timestamp", "status", "gender", "preferredGender"],
       ".read": "auth != null",
+
       "$userId": {
         ".read": "auth != null",
-        ".write": "auth != null && auth.uid == $userId"
+        ".write": "auth != null && auth.uid == $userId",
+        ".validate": "newData.hasChildren(['userId', 'status', 'gender', 'preferredGender', 'bucket', 'timestamp'])",
+
+        "userId": {
+          ".validate": "newData.val() == $userId"
+        },
+        "status": {
+          ".validate": "newData.val() == 'waiting' || newData.val() == 'matched'"
+        },
+        "gender": {
+          ".validate": "newData.val() == 'male' || newData.val() == 'female' || newData.val() == 'any'"
+        },
+        "preferredGender": {
+          ".validate": "newData.val() == 'male' || newData.val() == 'female' || newData.val() == 'any'"
+        },
+        "bucket": {
+          ".validate": "newData.val() == 'waiting_male' || newData.val() == 'waiting_female' || newData.val() == 'waiting_any'"
+        },
+        "timestamp": {
+          ".validate": "newData.val() <= now"
+        }
       }
     },
+
     "matches": {
       ".read": "auth != null",
+      ".indexOn": ["user1", "user2", "status", "createdAt"],
+
       "$matchId": {
+        ".read": "auth != null && (data.child('user1').val() == auth.uid || data.child('user2').val() == auth.uid)",
+        ".write": "auth != null && (
+          !data.exists() ||
+          data.child('user1').val() == auth.uid ||
+          data.child('user2').val() == auth.uid
+        )",
+        ".validate": "newData.hasChildren(['user1', 'user2', 'channelName', 'status'])",
+
+        "user1": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "user2": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "channelName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+        },
+        "status": {
+          ".validate": "newData.val() == 'active' || newData.val() == 'ended'"
+        },
+        "timeRemaining": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "cameraStatus": {
+          "$camUserId": {
+            ".validate": "newData.isBoolean() && $camUserId == auth.uid"
+          }
+        },
+        "endedBy": {
+          "$endUserId": {
+            ".validate": "newData.isBoolean() && $endUserId == auth.uid"
+          }
+        }
+      }
+    },
+
+    "matching_locks": {
+      ".read": false,
+      ".write": false
+    },
+
+    "presence": {
+      ".read": "auth != null",
+
+      "$userId": {
         ".read": "auth != null",
-        ".write": "auth != null"
+        ".write": "auth != null && auth.uid == $userId",
+        ".validate": "newData.hasChildren(['online', 'lastSeen'])",
+
+        "online": {
+          ".validate": "newData.isBoolean()"
+        },
+        "lastSeen": {
+          ".validate": "newData.val() <= now + 60000"
+        }
+      }
+    },
+
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null",
+
+        "newHeart": {
+          "$notificationId": {
+            ".validate": "newData.hasChildren(['timestamp', 'from'])",
+            "from": {
+              ".validate": "newData.isString()"
+            },
+            "timestamp": {
+              ".validate": "newData.val() <= now + 60000"
+            }
+          }
+        }
       }
     }
   }
