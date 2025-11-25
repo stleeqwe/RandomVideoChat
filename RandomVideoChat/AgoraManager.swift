@@ -751,7 +751,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
                         TokenProvider.shared.fetchToken(channel: savedChannel, uid: 0) { [weak self] token in
                             guard let self = self else { return }
                             DispatchQueue.main.async {
-                                self.joinChannel(channel: savedChannel, token: token, retryCount: 0)
+                                self.joinChannel(channel: savedChannel, token: token, retryCount: 0, uid: 0)
                             }
                         }
                     } else {
@@ -797,7 +797,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
                     TokenProvider.shared.fetchToken(channel: savedChannel, uid: 0) { [weak self] token in
                         guard let self = self else { return }
                         DispatchQueue.main.async {
-                            self.joinChannel(channel: savedChannel, token: token, retryCount: 0)
+                            self.joinChannel(channel: savedChannel, token: token, retryCount: 0, uid: 0)
                         }
                     }
                 } else {

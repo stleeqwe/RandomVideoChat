@@ -74,6 +74,15 @@ class UserManager: ObservableObject {
                 user.totalCallCount = totalCallCount
                 user.uniqueHeartGivers = uniqueHeartGivers
                 user.preferenceRate = preferenceRate
+
+                // 약관 동의 정보 로드
+                if let termsTimestamp = data["termsAgreedAt"] as? Timestamp {
+                    user.termsAgreedAt = termsTimestamp.dateValue()
+                }
+                if let privacyTimestamp = data["privacyAgreedAt"] as? Timestamp {
+                    user.privacyAgreedAt = privacyTimestamp.dateValue()
+                }
+
                 self?.currentUser = user
                 
                 #if DEBUG
@@ -809,5 +818,40 @@ class AppleReauthCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.makeKeyAndVisible()
         return window
+    }
+
+    // MARK: - Terms Agreement
+    func updateTermsAgreement(termsAgreedAt: Date, privacyAgreedAt: Date, completion: @escaping (Bool) -> Void) {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            completion(false)
+            return
+        }
+
+        let data: [String: Any] = [
+            "termsAgreedAt": Timestamp(date: termsAgreedAt),
+            "privacyAgreedAt": Timestamp(date: privacyAgreedAt),
+            "ageVerified": true
+        ]
+
+        db.collection("users").document(uid).updateData(data) { [weak self] error in
+            if let error = error {
+                #if DEBUG
+                print("❌ 약관 동의 저장 실패: \(error.localizedDescription)")
+                #endif
+                completion(false)
+            } else {
+                #if DEBUG
+                print("✅ 약관 동의 저장 완료")
+                #endif
+                self?.currentUser?.termsAgreedAt = termsAgreedAt
+                self?.currentUser?.privacyAgreedAt = privacyAgreedAt
+                self?.currentUser?.ageVerified = true
+                completion(true)
+            }
+        }
+    }
+
+    func hasAgreedToTerms() -> Bool {
+        return currentUser?.hasAgreedToTerms ?? false
     }
 }

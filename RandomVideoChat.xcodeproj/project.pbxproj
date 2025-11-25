@@ -51,6 +51,7 @@
 		88NQM00012F0000001234567 /* NetworkQualityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */; };
 		88TOK00012F0000001234567 /* TokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88TOK00002F0000001234567 /* TokenProvider.swift */; };
 		88CAM00012F0000001234567 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CAM00002F0000001234567 /* CameraManager.swift */; };
+		88TRM00012F0000001234567 /* TermsAgreementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88TRM00002F0000001234567 /* TermsAgreementView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -112,6 +113,7 @@
 		88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityMonitor.swift; sourceTree = "<group>"; };
 		88TOK00002F0000001234567 /* TokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenProvider.swift; sourceTree = "<group>"; };
 		88CAM00002F0000001234567 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+		88TRM00002F0000001234567 /* TermsAgreementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsAgreementView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -205,6 +207,7 @@
 				88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */,
 				88TOK00002F0000001234567 /* TokenProvider.swift */,
 				88CAM00002F0000001234567 /* CameraManager.swift */,
+				88TRM00002F0000001234567 /* TermsAgreementView.swift */,
 			);
 			path = RandomVideoChat;
 			sourceTree = "<group>";
@@ -409,6 +412,7 @@
 				88NQM00012F0000001234567 /* NetworkQualityMonitor.swift in Sources */,
 				88TOK00012F0000001234567 /* TokenProvider.swift in Sources */,
 				88CAM00012F0000001234567 /* CameraManager.swift in Sources */,
+				88TRM00012F0000001234567 /* TermsAgreementView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

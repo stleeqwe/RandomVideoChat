@@ -5,8 +5,9 @@ struct ContentView: View {
     @State private var showSplash = true
     @State private var isAuthenticated = false
     @State private var isCheckingAuth = true
+    @State private var hasAgreedToTerms = false
     @StateObject private var userManager = UserManager.shared
-    
+
     var body: some View {
         ZStack {
             if isCheckingAuth {
@@ -32,8 +33,15 @@ struct ContentView: View {
                 } else {
                     Text("iOS 15.0+ required").foregroundColor(.white)
                 }
+            } else if !hasAgreedToTerms {
+                // Terms agreement screen
+                if #available(iOS 15.0, *) {
+                    TermsAgreementView(hasAgreedToTerms: $hasAgreedToTerms)
+                } else {
+                    Text("iOS 15.0+ required").foregroundColor(.white)
+                }
             } else {
-                // Main app for authenticated users
+                // Main app for authenticated users who agreed to terms
                 if #available(iOS 15.0, *) {
                     MainView()
                 } else {
@@ -50,19 +58,21 @@ struct ContentView: View {
         .onReceive(userManager.$currentUser) { user in
             // React to user authentication state changes
             DispatchQueue.main.async {
-                if user != nil {
+                if let user = user {
                     self.isAuthenticated = true
+                    self.hasAgreedToTerms = user.hasAgreedToTerms
                 } else if !self.isCheckingAuth {
                     self.isAuthenticated = false
+                    self.hasAgreedToTerms = false
                 }
             }
         }
     }
-    
+
     func checkAuthStatus() {
         // Check if this is a fresh install (after app deletion)
         let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
-        
+
         if !hasLaunchedBefore {
             // First launch after fresh install - clear any lingering auth state
             print("🆕 Fresh install detected - clearing auth state")
@@ -73,18 +83,21 @@ struct ContentView: View {
             }
             UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
             isAuthenticated = false
+            hasAgreedToTerms = false
             isCheckingAuth = false
             return
         }
-        
+
         // Check for existing authenticated user
         if let user = Auth.auth().currentUser {
             print("✅ Found existing user: \(user.uid) - Auto login")
             UserManager.shared.loadCurrentUser(uid: user.uid)
             isAuthenticated = true
+            // hasAgreedToTerms will be updated via onReceive when currentUser is loaded
         } else {
             print("🔑 No authenticated user - Show onboarding")
             isAuthenticated = false
+            hasAgreedToTerms = false
         }
         isCheckingAuth = false
     }

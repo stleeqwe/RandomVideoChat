@@ -36,7 +36,9 @@ struct User: Codable {
     var birthDate: Date?
     var ageVerified: Bool
     var authProvider: String?
-    
+    var termsAgreedAt: Date?
+    var privacyAgreedAt: Date?
+
     // Preference-based matching fields
     var totalCallCount: Int
     var uniqueHeartGivers: [String]
@@ -54,6 +56,8 @@ struct User: Codable {
         self.birthDate = nil
         self.ageVerified = false
         self.authProvider = "anonymous"
+        self.termsAgreedAt = nil
+        self.privacyAgreedAt = nil
         self.totalCallCount = 0
         self.uniqueHeartGivers = []
         self.preferenceRate = 50.0
@@ -80,8 +84,21 @@ struct User: Codable {
         if let birthDate = birthDate {
             dict["birthDate"] = Timestamp(date: birthDate)
         }
-        
+
+        if let termsAgreedAt = termsAgreedAt {
+            dict["termsAgreedAt"] = Timestamp(date: termsAgreedAt)
+        }
+
+        if let privacyAgreedAt = privacyAgreedAt {
+            dict["privacyAgreedAt"] = Timestamp(date: privacyAgreedAt)
+        }
+
         return dict
+    }
+
+    // 약관 동의 여부 확인
+    var hasAgreedToTerms: Bool {
+        return termsAgreedAt != nil && privacyAgreedAt != nil
     }
     
     // 연령 계산 유틸리티
