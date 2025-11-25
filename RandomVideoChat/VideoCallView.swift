@@ -6,10 +6,18 @@ import FirebaseAuth
 import FirebaseFirestore
 import FirebaseDatabase
 
+// MARK: - VideoCallView
+/// Production-grade Video Call View
+/// Features:
+/// - Robust connection state handling
+/// - Network quality indicators
+/// - Graceful error recovery
+/// - Proper lifecycle management
 @available(iOS 15.0, *)
 struct VideoCallView: View {
+    // MARK: - State
     @State private var isCallActive = false
-    @State private var timeRemaining = 5  // Start at 5 seconds
+    @State private var timeRemaining = 5
     @State private var isTimerStarted = false
     @State private var timer: Timer?
     @State private var isMuted = false
@@ -19,582 +27,528 @@ struct VideoCallView: View {
     @State private var showHeartAnimation = false
     @State private var isCameraOn = true
     @State private var heartCountAnimation = false
-    
-    // 신고/차단 관련 상태
+
+    // Report/Block states
     @State private var showReportAlert = false
     @State private var showBlockAlert = false
     @State private var reportReason = ""
-    
-    // 앱 상태 및 백그라운드 감지를 위한 프로퍼티
+
+    // Error handling
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
+
+    // Background handling
     @Environment(\.scenePhase) private var scenePhase
     @State private var isBackground = false
     @State private var backgroundTerminationWorkItem: DispatchWorkItem?
     @State private var backgroundStartTime: Date?
 
+    // Managers
     @StateObject private var userManager = UserManager.shared
     @StateObject private var agoraManager = AgoraManager.shared
+    @StateObject private var matchingManager = MatchingManager.shared
+    @StateObject private var networkManager = NetworkManager.shared
 
     @Environment(\.presentationMode) var presentationMode
 
+    // MARK: - Body
     var body: some View {
         ZStack {
-            // 원격 비디오 전체 화면
-            AgoraVideoView(isLocal: false)
-                .ignoresSafeArea()
-            
-            // 전체 화면 상하단 그라데이션
-            LinearGradient(
-                gradient: Gradient(stops: [
-                    .init(color: Color.black.opacity(0.6), location: 0.0),   // 상단 어두움
-                    .init(color: Color.black.opacity(0.05), location: 0.25), // 상단 중간 밝음
-                    .init(color: Color.clear, location: 0.5),                // 중앙 완전 투명
-                    .init(color: Color.black.opacity(0.05), location: 0.75), // 하단 중간 밝음
-                    .init(color: Color.black.opacity(0.7), location: 1.0)    // 하단 어두움
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // Remote video (fullscreen)
+            remoteVideoLayer
+
+            // Gradient overlay
+            gradientOverlay
 
             // Connection status banner
-            VStack {
-                if agoraManager.connectionState == .reconnecting {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        Text("Reconnecting…")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .background(Color.orange.opacity(0.8))
-                    .cornerRadius(12)
-                    .padding(.top, 50)
-                }
-                Spacer()
-            }
+            connectionStatusBanner
 
-            // 상단 좌측 신고/차단 버튼
-            VStack {
-                HStack {
-                    VStack(spacing: 12) {
-                        // 신고 버튼
-                        Button(action: { showReportAlert = true }) {
-                            Circle()
-                                .fill(Color.orange.opacity(0.4))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
-                                )
-                        }
-                        
-                        // 차단 버튼 - 더 직관적인 아이콘으로 변경
-                        Button(action: { showBlockAlert = true }) {
-                            Circle()
-                                .fill(Color.red.opacity(0.4))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Image(systemName: "nosign")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
-                                )
-                        }
-                    }
-                    .padding(.leading, 20)
-                    .padding(.top, 45)
-                    
-                    Spacer()
-                }
-                
-                Spacer()
-            }
+            // Network quality indicator
+            networkQualityIndicator
 
-            
-            // 우측 하단 PIP와 컨트롤들
-            VStack {
-                Spacer()
-                
-                HStack {
-                    Spacer()
-                    
-                    VStack(spacing: 12) {
-                        // PIP 비디오
-                        ZStack {
-                            if isCameraOn {
-                                // PIP: 컨테이너를 자연스럽게 채우도록 로컬 렌더 모드(hidden)와 함께 사용
-                                AgoraVideoView(isLocal: true)
-                                    .frame(width: 100, height: 140)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                    )
-                            } else {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.black)
-                                    .frame(width: 100, height: 140)
-                                    .overlay(
-                                        Image(systemName: "person.crop.circle.fill")
-                                            .font(.system(size: 40))
-                                            .foregroundColor(.white.opacity(0.5))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                    )
-                            }
-                        }
-                        
-                        // 카메라 아이콘과 마이크 아이콘
-                        HStack(spacing: 12) {
-                            // 카메라 아이콘
-                            Button(action: {
-                                // 실제 비디오 스트림 제어 + 상태 신호
-                                let isCameraOff = AgoraManager.shared.toggleCamera()
-                                isCameraOn = !isCameraOff
-                                // Firebase에 카메라 상태 신호 전송
-                                MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
-                                // 카메라 상태를 UserDefaults에 저장
-                                UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
-                            }) {
-                                Image(systemName: isCameraOn ? "camera.fill" : "camera")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.white)
-                            }
-                            
-                            // 마이크 아이콘
-                            Button(action: toggleMute) {
-                                ZStack {
-                                    Image(systemName: "mic.fill")
-                                        .font(.system(size: 28))
-                                        .foregroundColor(.white)
-                                    
-                                    // 마이크 꺼진 상태에서 사선 표시
-                                    if isMuted {
-                                        Rectangle()
-                                            .frame(width: 35, height: 2)
-                                            .foregroundColor(.red)
-                                            .rotationEffect(.degrees(45))
-                                            .offset(x: 0, y: -2)
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // 하트 개수 표시
-                        HStack(spacing: 4) {
-                            Image(systemName: "heart.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(.red)
-                            Text("X  \(heartCount)")
-                                .font(.custom("Carter One", size: 22))
-                                .foregroundColor(.white)
-                                .scaleEffect(heartCountAnimation ? 1.2 : 1.0)
-                                .animation(.easeInOut(duration: 0.4), value: heartCountAnimation)
-                        }
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 180)
-                }
-            }
-            
-            // 좌측 하단 타이머 (카메라/마이크 아이콘의 대각선 반대편)
-            VStack {
-                Spacer()
-                
-                HStack {
-                    // 타이머를 초 단위로 표시
-                    Text("\(timeRemaining)")
-                        .font(.custom("Carter One", size: 36))
-                        .foregroundColor(timeRemaining <= 10 ? .red : .white)  // 10초 이하에서 빨간색
-                        .monospacedDigit()
-                        .padding(.leading, 20)
-                        .padding(.bottom, 180)
-                    
-                    Spacer()
-                }
-            }
-            
-            // 하단 가운데 +60초 버튼
-            VStack {
-                Spacer()
-                
-                Button(action: {
-                    if heartCount > 0 && !opponentUserId.isEmpty {
-                        withAnimation {
-                            heartCountAnimation = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            heartCountAnimation = false
-                        }
-                        
-                        if let uid = Auth.auth().currentUser?.uid {
-                            // 1) UI를 즉시 업데이트
-                            heartCount -= 1
-                            UserDefaults.standard.set(heartCount, forKey: "heartCount")
-                            
-                            // 2) 타이머 +60초
-                            timeRemaining += 60
-                            MatchingManager.shared.updateCallTimer(timeRemaining)
-                            
-                            // 3) 서버에 원자적으로 하트 감소 (FieldValue.increment 사용)
-                            userManager.changeHeartCount(uid: uid, delta: -1)
-                            
-                            // 4) 상대방에게 하트 알림 전송
-                            userManager.sendHeartToOpponent(opponentUserId)
-                            
-                            if isTimerStarted {
-                                startTimer()
-                            }
-                        }
-                    }
-                }) {
-                    VStack(spacing: 4) {
-                        Image("plus.square")
-                            .resizable()
-                            .frame(width: 40, height: 40)
-                            .foregroundColor(.white)
-                        Text("60s")
-                            .font(.custom("Carter One", size: 16))
-                            .foregroundColor(.white)
-                    }
-                }
-                .disabled(heartCount <= 0)
-                .opacity(heartCount <= 0 ? 0.5 : 1.0)
-                .padding(.bottom, 50)
-            }
-            
-            // 우측 하단 통화종료 버튼
-            VStack {
-                Spacer()
-                
-                HStack {
-                    Spacer()
-                    
-                    // 통화종료 버튼
-                    Button(action: endVideoCall) {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 50, height: 50)
-                            .overlay(
-                                Image(systemName: "phone.down.fill")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundColor(.white)
-                            )
-                    }
-                    .padding(.trailing, 40)
-                }
-                .padding(.bottom, 65)
-            }
+            // Report/Block buttons
+            reportBlockButtons
 
+            // PIP and controls (right side)
+            pipAndControls
+
+            // Timer (left bottom)
+            timerDisplay
+
+            // +60s button (center bottom)
+            addTimeButton
+
+            // End call button (right bottom)
+            endCallButton
         }
-        .onAppear {
-            print("🔴🔴🔴 [VideoCallView] onAppear 호출됨")
-            setupVideoCall()
-        }
-        .onChange(of: agoraManager.remoteUserJoined) { joined in
-            if joined && !isTimerStarted {
-                print("✅ 원격 사용자 참가 감지 - 1초 후 타이머 시작")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    if self.agoraManager.remoteUserJoined && !self.isTimerStarted {
-                        self.startTimer()
-                    }
-                }
-            }
-        }
-        // After join success, broadcast our current camera overlay state once
-        .onChange(of: agoraManager.isInCall) { inCall in
-            if inCall {
-                MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
-            }
-        }
+        .onAppear(perform: setupVideoCall)
+        .onChange(of: agoraManager.remoteUserJoined, perform: handleRemoteUserJoined)
+        .onChange(of: agoraManager.isInCall, perform: handleCallStateChange)
+        .onChange(of: agoraManager.connectionState, perform: handleConnectionStateChange)
+        .onChange(of: scenePhase, perform: handleScenePhaseChange)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
             handleAppTermination()
         }
-        .onChange(of: scenePhase) { newPhase in
-            handleScenePhaseChange(newPhase)
-        }
-        .onDisappear {
-            onDisappearTasks()
-        }
+        .onDisappear(perform: onDisappearTasks)
         .alert("사용자 신고", isPresented: $showReportAlert) {
-            Button("스팸/광고") { reportUser(reason: "스팸/광고") }
-            Button("부적절한 콘텐츠") { reportUser(reason: "부적절한 콘텐츠") }
-            Button("욕설/괴롭힘") { reportUser(reason: "욕설/괴롭힘") }
-            Button("기타") { reportUser(reason: "기타") }
-            Button("취소", role: .cancel) { }
+            reportAlertButtons
         } message: {
             Text("이 사용자를 신고하는 이유를 선택해주세요.")
         }
         .alert("사용자 차단", isPresented: $showBlockAlert) {
-            Button("차단", role: .destructive) { blockUser() }
-            Button("취소", role: .cancel) { }
+            blockAlertButtons
         } message: {
             Text("이 사용자를 차단하시겠습니까? 차단된 사용자와는 다시 매칭되지 않습니다.")
         }
-    }
-    
-    private func handleAppTermination() {
-        guard !isCallEnding else { return }
-        cleanupAfterCallEnd(signalEnd: true)
-    }
-    
-    private func onDisappearTasks() {
-        // 백그라운드로 이동했다면 즉시 종료하지 않음
-        if isBackground {
-            return
-        }
-        
-        cleanupAfterCallEnd(signalEnd: true)
-    }
-    
-    private func cleanupCallSyncObservers() {
-        // 기존 MatchingManager의 cleanupCallObservers와 중복되지 않는 추가 정리 작업
-        // 현재는 MatchingManager에서 대부분 처리하므로 빈 함수로 둠
-    }
-    
-    // MARK: - 통합된 정리 함수
-    private func cleanupAfterCallEnd(signalEnd: Bool) {
-        guard !isCallEnding else { return }
-        
-        isCallEnding = true
-        
-        // 백그라운드 타이머 및 상태 완전 정리
-        backgroundTerminationWorkItem?.cancel()
-        backgroundTerminationWorkItem = nil
-        backgroundStartTime = nil
-        isBackground = false
-        
-        #if DEBUG
-        print("📱 통화 종료 - 백그라운드 관련 상태 모두 초기화")
-        #endif
-        
-        if signalEnd {
-            // 내가 종료하는 경우에만 통화 종료 신호 전송 (matchId 삭제 전에 실행)
-            if let matchId = UserDefaults.standard.string(forKey: "currentMatchId") {
-                MatchingManager.shared.signalCallEnd(matchId: matchId)
-                print("📡 통화 종료 신호 전송 시도: matchId = \(matchId)")
-            } else {
-                print("❌ 통화 종료 신호 전송 실패: matchId가 없음")
-                // matchId가 없어도 일단 기본 함수 시도
-                MatchingManager.shared.signalCallEnd()
+        .alert("연결 오류", isPresented: $showErrorAlert) {
+            Button("확인") {
+                endVideoCall()
             }
+        } message: {
+            Text(errorMessage)
         }
-        
-        // 매칭 상태를 항상 초기화 (signalEnd 후에 실행하여 matchId 삭제)
-        MatchingManager.shared.cancelMatching()
-        
-        if !signalEnd {
-            // 상대방이 종료한 경우 MATCHED! 플래시 방지를 위해 플래그 설정
-            MatchingManager.shared.callEndedByOpponent = true
-        }
-        
-        // 타이머 정리
-        timer?.invalidate()
-        
-        // Agora 연결 종료
-        AgoraManager.shared.endCall()
-        
-        // Firebase 리스너 정리
-        MatchingManager.shared.cleanupCallObservers()
-        cleanupCallSyncObservers()
-        
-        // UserDefaults 정리
-        UserDefaults.standard.removeObject(forKey: "currentChannelName")
-        UserDefaults.standard.removeObject(forKey: "currentMatchId")
     }
-    
-    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
-        if newPhase == .background || newPhase == .inactive {
-            // 백그라운드 진입
-            if !isBackground {
-                isBackground = true
-                backgroundStartTime = Date()
-                
-                #if DEBUG
-                print("📱 백그라운드 진입 - 타이머 일시중지")
-                #endif
-                
-                // 타이머 일시중지 (백그라운드에서는 타이머 중지)
-                timer?.invalidate()
-                
-                // 기존 타이머가 있다면 취소 (안전장치)
-                backgroundTerminationWorkItem?.cancel()
-                
-                // 60초 후 통화 종료를 예약 (기존 30초에서 60초로 연장)
-                let workItem = DispatchWorkItem {
-                    if self.isBackground && !self.isCallEnding {
-                        #if DEBUG
-                        print("📱 백그라운드 60초 경과 - 통화 종료")
-                        #endif
-                        self.cleanupAfterCallEnd(signalEnd: true)
-                        self.presentationMode.wrappedValue.dismiss()
-                    }
-                }
-                backgroundTerminationWorkItem = workItem
-                DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: workItem)
-            }
-            
-        } else if newPhase == .active {
-            // 앱이 다시 활성화
-            if isBackground {
-                let backgroundDuration = backgroundStartTime.map { Date().timeIntervalSince($0) } ?? 0
-                
-                #if DEBUG
-                print("📱 포어그라운드 복귀 - 백그라운드 소요시간: \(String(format: "%.1f", backgroundDuration))초")
-                #endif
-                
-                isBackground = false
-                backgroundStartTime = nil
-                
-                // 예약된 종료 작업 취소 및 초기화
-                backgroundTerminationWorkItem?.cancel()
-                backgroundTerminationWorkItem = nil
-                
-                // 타이머 재시작 (포어그라운드 복귀 시)
-                if isTimerStarted && !isCallEnding {
-                    startTimer()
-                }
-                
-                // 비디오 스트림 재활성화 (필요한 경우)
-                if AgoraManager.shared.isInCall {
-                    AgoraManager.shared.agoraKit?.enableLocalVideo(true)
-                    AgoraManager.shared.agoraKit?.startPreview()
-                }
-                
-                #if DEBUG
-                print("📱 백그라운드 타이머 완전 초기화 및 비디오 재시작 완료")
-                #endif
+
+    // MARK: - View Components
+
+    private var remoteVideoLayer: some View {
+        ZStack {
+            AgoraVideoView(isLocal: false)
+                .ignoresSafeArea()
+
+            // Remote camera off overlay
+            if agoraManager.remoteCameraMuted {
+                Color.black
+                    .ignoresSafeArea()
+                    .overlay(
+                        VStack(spacing: 16) {
+                            Image(systemName: "video.slash.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white.opacity(0.5))
+                            Text("상대방 카메라 꺼짐")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                    )
             }
         }
     }
 
-    // MARK: - 하트 실시간 관찰
-    func observeHeartCount(uid: String) {
-        let db = Firestore.firestore()
-        db.collection("users").document(uid)
-            .addSnapshotListener { documentSnapshot, error in
-                guard let document = documentSnapshot else { return }
-                if let data = document.data(),
-                   let newHeartCount = data["heartCount"] as? Int {
-                    if newHeartCount != heartCount {
-                        DispatchQueue.main.async {
-                            heartCount = newHeartCount
-                            UserDefaults.standard.set(newHeartCount, forKey: "heartCount")
+    private var gradientOverlay: some View {
+        LinearGradient(
+            gradient: Gradient(stops: [
+                .init(color: Color.black.opacity(0.6), location: 0.0),
+                .init(color: Color.black.opacity(0.05), location: 0.25),
+                .init(color: Color.clear, location: 0.5),
+                .init(color: Color.black.opacity(0.05), location: 0.75),
+                .init(color: Color.black.opacity(0.7), location: 1.0)
+            ]),
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+
+    private var connectionStatusBanner: some View {
+        VStack {
+            if case .reconnecting = agoraManager.connectionState {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    Text("재연결 중...")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(Color.orange.opacity(0.9))
+                .cornerRadius(12)
+                .padding(.top, 50)
+            } else if case .failed = agoraManager.connectionState {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.white)
+                    Text("연결 실패")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(Color.red.opacity(0.9))
+                .cornerRadius(12)
+                .padding(.top, 50)
+            }
+            Spacer()
+        }
+    }
+
+    private var networkQualityIndicator: some View {
+        VStack {
+            HStack {
+                Spacer()
+
+                // Network quality badge
+                HStack(spacing: 4) {
+                    networkQualityIcon
+                    if networkManager.networkQuality == .poor || networkManager.networkQuality == .bad {
+                        Text("불안정")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(networkQualityColor.opacity(0.8))
+                .cornerRadius(8)
+                .padding(.top, 50)
+                .padding(.trailing, 20)
+            }
+            Spacer()
+        }
+    }
+
+    private var networkQualityIcon: some View {
+        Image(systemName: networkQualityIconName)
+            .font(.system(size: 12, weight: .bold))
+            .foregroundColor(.white)
+    }
+
+    private var networkQualityIconName: String {
+        switch networkManager.networkQuality {
+        case .excellent, .good:
+            return "wifi"
+        case .fair:
+            return "wifi.exclamationmark"
+        case .poor, .bad:
+            return "wifi.slash"
+        default:
+            return "questionmark.circle"
+        }
+    }
+
+    private var networkQualityColor: Color {
+        switch networkManager.networkQuality {
+        case .excellent, .good:
+            return .green
+        case .fair:
+            return .yellow
+        case .poor, .bad:
+            return .red
+        default:
+            return .gray
+        }
+    }
+
+    private var reportBlockButtons: some View {
+        VStack {
+            HStack {
+                VStack(spacing: 12) {
+                    Button(action: { showReportAlert = true }) {
+                        Circle()
+                            .fill(Color.orange.opacity(0.4))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                            )
+                    }
+
+                    Button(action: { showBlockAlert = true }) {
+                        Circle()
+                            .fill(Color.red.opacity(0.4))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Image(systemName: "nosign")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                            )
+                    }
+                }
+                .padding(.leading, 20)
+                .padding(.top, 45)
+
+                Spacer()
+            }
+
+            Spacer()
+        }
+    }
+
+    private var pipAndControls: some View {
+        VStack {
+            Spacer()
+
+            HStack {
+                Spacer()
+
+                VStack(spacing: 12) {
+                    // PIP video
+                    ZStack {
+                        if isCameraOn {
+                            AgoraVideoView(isLocal: true)
+                                .frame(width: 100, height: 140)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black)
+                                .frame(width: 100, height: 140)
+                                .overlay(
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.white.opacity(0.5))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                )
                         }
                     }
+
+                    // Camera and mic controls
+                    HStack(spacing: 12) {
+                        Button(action: toggleCamera) {
+                            Image(systemName: isCameraOn ? "camera.fill" : "camera")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white)
+                        }
+
+                        Button(action: toggleMute) {
+                            ZStack {
+                                Image(systemName: "mic.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white)
+
+                                if isMuted {
+                                    Rectangle()
+                                        .frame(width: 35, height: 2)
+                                        .foregroundColor(.red)
+                                        .rotationEffect(.degrees(45))
+                                        .offset(x: 0, y: -2)
+                                }
+                            }
+                        }
+                    }
+
+                    // Heart count
+                    HStack(spacing: 4) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.red)
+                        Text("X  \(heartCount)")
+                            .font(.custom("Carter One", size: 22))
+                            .foregroundColor(.white)
+                            .scaleEffect(heartCountAnimation ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.4), value: heartCountAnimation)
+                    }
                 }
+                .padding(.trailing, 20)
+                .padding(.bottom, 180)
             }
+        }
     }
 
-    // MARK: - 새 하트 알림 관찰
-    func observeNewHeartNotification() {
+    private var timerDisplay: some View {
+        VStack {
+            Spacer()
+
+            HStack {
+                Text("\(timeRemaining)")
+                    .font(.custom("Carter One", size: 36))
+                    .foregroundColor(timeRemaining <= 10 ? .red : .white)
+                    .monospacedDigit()
+                    .padding(.leading, 20)
+                    .padding(.bottom, 180)
+
+                Spacer()
+            }
+        }
+    }
+
+    private var addTimeButton: some View {
+        VStack {
+            Spacer()
+
+            Button(action: addTime) {
+                VStack(spacing: 4) {
+                    Image("plus.square")
+                        .resizable()
+                        .frame(width: 40, height: 40)
+                        .foregroundColor(.white)
+                    Text("60s")
+                        .font(.custom("Carter One", size: 16))
+                        .foregroundColor(.white)
+                }
+            }
+            .disabled(heartCount <= 0)
+            .opacity(heartCount <= 0 ? 0.5 : 1.0)
+            .padding(.bottom, 50)
+        }
+    }
+
+    private var endCallButton: some View {
+        VStack {
+            Spacer()
+
+            HStack {
+                Spacer()
+
+                Button(action: endVideoCall) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Image(systemName: "phone.down.fill")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.white)
+                        )
+                }
+                .padding(.trailing, 40)
+            }
+            .padding(.bottom, 65)
+        }
+    }
+
+    @ViewBuilder
+    private var reportAlertButtons: some View {
+        Button("스팸/광고") { reportUser(reason: "스팸/광고") }
+        Button("부적절한 콘텐츠") { reportUser(reason: "부적절한 콘텐츠") }
+        Button("욕설/괴롭힘") { reportUser(reason: "욕설/괴롭힘") }
+        Button("기타") { reportUser(reason: "기타") }
+        Button("취소", role: .cancel) { }
+    }
+
+    @ViewBuilder
+    private var blockAlertButtons: some View {
+        Button("차단", role: .destructive) { blockUser() }
+        Button("취소", role: .cancel) { }
+    }
+
+    // MARK: - Actions
+
+    private func toggleCamera() {
+        let isCameraOff = AgoraManager.shared.toggleCamera()
+        isCameraOn = !isCameraOff
+        MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
+        UserDefaults.standard.set(isCameraOn, forKey: "isCameraOn")
+    }
+
+    private func toggleMute() {
+        isMuted = AgoraManager.shared.toggleMute()
+    }
+
+    private func addTime() {
+        guard heartCount > 0, !opponentUserId.isEmpty else { return }
+
+        withAnimation {
+            heartCountAnimation = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            heartCountAnimation = false
+        }
+
         guard let uid = Auth.auth().currentUser?.uid else { return }
-        Database.database().reference()
-            .child("notifications")
-            .child(uid)
-            .child("newHeart")
-            .observe(.childAdded) { snapshot in
-                
-                // 로컬 UI에서 즉시 반영
-                DispatchQueue.main.async {
-                    heartCount += 1
-                    UserDefaults.standard.set(heartCount, forKey: "heartCount")
-                }
-                
-                // 서버에 +1 원자적 증가 (FieldValue.increment 사용)
-                userManager.changeHeartCount(uid: uid, delta: +1)
-                
-                // 알림 데이터 삭제
-                snapshot.ref.removeValue()
-            }
+
+        heartCount -= 1
+        UserDefaults.standard.set(heartCount, forKey: "heartCount")
+
+        timeRemaining += 60
+        MatchingManager.shared.updateCallTimer(timeRemaining)
+
+        userManager.changeHeartCount(uid: uid, delta: -1)
+        userManager.sendHeartToOpponent(opponentUserId)
+
+        if isTimerStarted {
+            startTimer()
+        }
     }
 
-    // MARK: - Video Call Setup and Management
+    // MARK: - Setup
+
     private func setupVideoCall() {
+        #if DEBUG
+        print("🔴 [VideoCallView] onAppear")
+        #endif
+
         setupCameraState()
-        // 오디오 라우팅은 AgoraManager에서 관리 (기본: 수화기)
-        
-        // 채널명이 있는지 먼저 확인
+        networkManager.startMonitoring()
+
         guard let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
               !channelName.isEmpty else {
-            print("❌ 채널명이 없어서 통화를 시작할 수 없음")
+            #if DEBUG
+            print("❌ No channel name - cannot start call")
+            #endif
+            showError("채널 정보가 없습니다.")
             return
         }
-        
-        // 비디오 통화 시작
+
         startVideoCall()
-        
-        // 사용자 데이터 설정
         setupUserData()
-        
-        // 상대방 관찰 설정
         setupOpponentObservation()
-        
-        // 통화 옵저버 설정 (약간의 지연 후)
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.setupCallObservers()
+            setupCallObservers()
         }
     }
-    
+
     private func setupCameraState() {
-        // 메인화면에서 설정한 카메라 상태 복원
         isCameraOn = UserDefaults.standard.bool(forKey: "isCameraOn")
-        // 기본값이 false이므로 한번도 설정하지 않았다면 true로 설정
         if UserDefaults.standard.object(forKey: "isCameraOn") == nil {
             isCameraOn = true
             UserDefaults.standard.set(true, forKey: "isCameraOn")
         }
-        
-        // Agora 카메라 상태도 동기화 (오버레이만 적용)
+
         if !isCameraOn {
             _ = AgoraManager.shared.toggleCamera()
         }
     }
-    
+
     private func setupUserData() {
         guard let uid = Auth.auth().currentUser?.uid else { return }
-        
+
         userManager.loadCurrentUser(uid: uid)
         observeHeartCount(uid: uid)
         observeNewHeartNotification()
-        
+
         if let currentHeartCount = userManager.currentUser?.heartCount {
             heartCount = currentHeartCount
         }
     }
-    
+
     private func setupOpponentObservation() {
         guard let matchedUserId = MatchingManager.shared.matchedUserId else {
-            print("❌ [VideoCallView] matchedUserId가 없음!")
+            #if DEBUG
+            print("❌ [VideoCallView] No matchedUserId")
+            #endif
             return
         }
-        
-        print("🔴 [VideoCallView] setupOpponentObservation - 상대방: \(matchedUserId)")
+
+        #if DEBUG
+        print("🔴 [VideoCallView] setupOpponentObservation - opponent: \(matchedUserId)")
+        #endif
+
         opponentUserId = matchedUserId
         UserManager.shared.addRecentMatch(matchedUserId)
-        
-        // 상대방 presence 감시 시작
+
         MatchingManager.shared.observeOpponentPresence(opponentId: matchedUserId) {
             DispatchQueue.main.async {
-                guard !isCallEnding && !isBackground else { return }
+                guard !isCallEnding, !isBackground else { return }
                 endVideoCall()
             }
         }
 
-        // 상대방 카메라 상태 관찰 시작
         MatchingManager.shared.observeOpponentCameraStatus(opponentId: matchedUserId) { isOn in
             DispatchQueue.main.async {
                 AgoraManager.shared.applyRemoteCameraMuted(!isOn)
             }
         }
     }
-    
+
     private func setupCallObservers() {
-        // 타이머 동기화 관찰
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             MatchingManager.shared.observeCallTimer { syncedTime in
                 if syncedTime > timeRemaining {
@@ -605,20 +559,17 @@ struct VideoCallView: View {
                 }
             }
         }
-        
-        // 1) 통화 종료 관찰 등록 함수 정의
+
         func registerCallEndObserver() {
             if let matchId = UserDefaults.standard.string(forKey: "currentMatchId"), !matchId.isEmpty {
-                // endedBy 필드 기반 관찰
                 MatchingManager.shared.observeCallEnd {
                     guard !isCallEnding else { return }
                     cleanupAfterCallEnd(signalEnd: false)
-                    // 뷰 반영 후 dismiss
                     DispatchQueue.main.async {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
-                // status 필드 기반 관찰 (이중 안전장치)
+
                 MatchingManager.shared.observeCallStatusEnded {
                     guard !isCallEnding else { return }
                     cleanupAfterCallEnd(signalEnd: false)
@@ -627,62 +578,66 @@ struct VideoCallView: View {
                     }
                 }
             } else {
-                // matchId가 없으면 0.3초 후 재시도
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     registerCallEndObserver()
                 }
             }
         }
-        
-        // 옵저버 등록 시작
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             registerCallEndObserver()
         }
     }
-    
-    func startVideoCall() {
+
+    // MARK: - Call Management
+
+    private func startVideoCall() {
         isCallActive = true
-        
-        if let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
-           !channelName.isEmpty {
-            print("📺 비디오 통화 시작: 채널 \(channelName)")
-            
-            // 매칭 큐에서 즉시 제거 (백그라운드에서)
-            if let userId = Auth.auth().currentUser?.uid {
-                MatchingManager.shared.removeFromQueueIfNeeded(userId: userId)
-            }
-            
-            // Agora 통화 시작
-            AgoraManager.shared.startCall(channel: channelName)
-        } else {
-            print("❌ 채널명이 없어서 통화를 시작할 수 없음")
+
+        guard let channelName = UserDefaults.standard.string(forKey: "currentChannelName"),
+              !channelName.isEmpty else {
+            #if DEBUG
+            print("❌ No channel name")
+            #endif
+            return
         }
+
+        #if DEBUG
+        print("📺 Starting video call: \(channelName)")
+        #endif
+
+        if let userId = Auth.auth().currentUser?.uid {
+            MatchingManager.shared.removeFromQueueIfNeeded(userId: userId)
+        }
+
+        AgoraManager.shared.startCall(channel: channelName)
     }
 
-    func startTimer() {
-        // 기존 타이머가 있다면 먼저 정리
+    private func startTimer() {
         timer?.invalidate()
         timer = nil
-        
+
         isTimerStarted = true
-        
-        print("⏱ 타이머 시작: \(timeRemaining)초")
-        
+
+        #if DEBUG
+        print("⏱ Timer started: \(timeRemaining)s")
+        #endif
+
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if self.timeRemaining > 0 {
-                self.timeRemaining -= 1
-                
-                // 5초마다 Firebase에 동기화
-                if self.timeRemaining % 5 == 0 {
-                    MatchingManager.shared.updateCallTimer(self.timeRemaining)
+            if timeRemaining > 0 {
+                timeRemaining -= 1
+
+                if timeRemaining % 5 == 0 {
+                    MatchingManager.shared.updateCallTimer(timeRemaining)
                 }
             } else {
-                print("⏱ 타이머 만료 - 통화 종료")
-                self.endVideoCall()
+                #if DEBUG
+                print("⏱ Timer expired - ending call")
+                #endif
+                endVideoCall()
             }
         }
-        
-        // RunLoop에 추가하여 백그라운드에서도 작동하도록
+
         RunLoop.current.add(timer!, forMode: .common)
     }
 
@@ -691,45 +646,207 @@ struct VideoCallView: View {
         presentationMode.wrappedValue.dismiss()
     }
 
-    func toggleMute() {
-        isMuted = AgoraManager.shared.toggleMute()
-    }
+    // MARK: - Event Handlers
 
-    func switchCamera() {
-        AgoraManager.shared.switchCamera()
-    }
-    
-    // MARK: - Enhanced Report and Block Functions
-    private func reportUser(reason: String) {
-        guard !opponentUserId.isEmpty else {
-            print("❌ 신고 실패: 상대방 ID가 없음")
-            return
-        }
-        
-        ContentModerationManager.shared.reportUser(reportedUserId: opponentUserId, reason: reason) { success in
-            DispatchQueue.main.async {
-                if success {
-                    print("✅ 신고 완료: \(reason)")
-                    // 신고 완료 후 통화 종료
-                    self.endVideoCall()
-                } else {
-                    print("❌ 신고 실패")
+    private func handleRemoteUserJoined(_ joined: Bool) {
+        if joined && !isTimerStarted {
+            #if DEBUG
+            print("✅ Remote user joined - starting timer in 1s")
+            #endif
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                if agoraManager.remoteUserJoined && !isTimerStarted {
+                    startTimer()
                 }
             }
         }
     }
-    
-    private func blockUser() {
-        guard !opponentUserId.isEmpty else {
-            print("❌ 차단 실패: 상대방 ID가 없음")
-            return
+
+    private func handleCallStateChange(_ inCall: Bool) {
+        if inCall {
+            MatchingManager.shared.signalCameraStatus(isOn: isCameraOn)
         }
-        
-        // 강화된 신고 및 차단 (자동 신고 포함)
+    }
+
+    private func handleConnectionStateChange(_ state: AgoraConnectionState) {
+        if case .failed(let error) = state {
+            switch error {
+            case .tokenExpired, .tokenInvalid:
+                showError("인증이 만료되었습니다.")
+            case .networkError:
+                // Will retry automatically
+                break
+            default:
+                break
+            }
+        }
+    }
+
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        if newPhase == .background || newPhase == .inactive {
+            if !isBackground {
+                isBackground = true
+                backgroundStartTime = Date()
+
+                #if DEBUG
+                print("📱 Background - pausing timer")
+                #endif
+
+                timer?.invalidate()
+                backgroundTerminationWorkItem?.cancel()
+
+                let workItem = DispatchWorkItem {
+                    if isBackground && !isCallEnding {
+                        #if DEBUG
+                        print("📱 Background 60s elapsed - ending call")
+                        #endif
+                        cleanupAfterCallEnd(signalEnd: true)
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+                backgroundTerminationWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: workItem)
+            }
+        } else if newPhase == .active {
+            if isBackground {
+                let duration = backgroundStartTime.map { Date().timeIntervalSince($0) } ?? 0
+
+                #if DEBUG
+                print("📱 Foreground - background duration: \(String(format: "%.1f", duration))s")
+                #endif
+
+                isBackground = false
+                backgroundStartTime = nil
+                backgroundTerminationWorkItem?.cancel()
+                backgroundTerminationWorkItem = nil
+
+                if isTimerStarted && !isCallEnding {
+                    startTimer()
+                }
+
+                if AgoraManager.shared.isInCall {
+                    AgoraManager.shared.agoraKit?.enableLocalVideo(true)
+                    AgoraManager.shared.agoraKit?.startPreview()
+                }
+            }
+        }
+    }
+
+    private func handleAppTermination() {
+        guard !isCallEnding else { return }
+        cleanupAfterCallEnd(signalEnd: true)
+    }
+
+    private func onDisappearTasks() {
+        if isBackground { return }
+        cleanupAfterCallEnd(signalEnd: true)
+    }
+
+    // MARK: - Cleanup
+
+    private func cleanupAfterCallEnd(signalEnd: Bool) {
+        guard !isCallEnding else { return }
+
+        isCallEnding = true
+
+        backgroundTerminationWorkItem?.cancel()
+        backgroundTerminationWorkItem = nil
+        backgroundStartTime = nil
+        isBackground = false
+
+        #if DEBUG
+        print("📱 Call ending - cleanup started")
+        #endif
+
+        if signalEnd {
+            if let matchId = UserDefaults.standard.string(forKey: "currentMatchId") {
+                MatchingManager.shared.signalCallEnd(matchId: matchId)
+            } else {
+                MatchingManager.shared.signalCallEnd()
+            }
+        }
+
+        MatchingManager.shared.cancelMatching()
+
+        if !signalEnd {
+            MatchingManager.shared.callEndedByOpponent = true
+        }
+
+        timer?.invalidate()
+        timer = nil
+
+        AgoraManager.shared.endCall()
+        MatchingManager.shared.cleanupCallObservers()
+
+        UserDefaults.standard.removeObject(forKey: "currentChannelName")
+        UserDefaults.standard.removeObject(forKey: "currentMatchId")
+    }
+
+    // MARK: - Heart Observation
+
+    private func observeHeartCount(uid: String) {
+        Firestore.firestore().collection("users").document(uid)
+            .addSnapshotListener { snapshot, error in
+                guard let data = snapshot?.data(),
+                      let newCount = data["heartCount"] as? Int,
+                      newCount != heartCount else { return }
+
+                DispatchQueue.main.async {
+                    heartCount = newCount
+                    UserDefaults.standard.set(newCount, forKey: "heartCount")
+                }
+            }
+    }
+
+    private func observeNewHeartNotification() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+
+        Database.database().reference()
+            .child("notifications")
+            .child(uid)
+            .child("newHeart")
+            .observe(.childAdded) { snapshot in
+                DispatchQueue.main.async {
+                    heartCount += 1
+                    UserDefaults.standard.set(heartCount, forKey: "heartCount")
+                }
+
+                userManager.changeHeartCount(uid: uid, delta: +1)
+                snapshot.ref.removeValue()
+            }
+    }
+
+    // MARK: - Report/Block
+
+    private func reportUser(reason: String) {
+        guard !opponentUserId.isEmpty else { return }
+
+        ContentModerationManager.shared.reportUser(reportedUserId: opponentUserId, reason: reason) { success in
+            DispatchQueue.main.async {
+                if success {
+                    #if DEBUG
+                    print("✅ Report submitted: \(reason)")
+                    #endif
+                    endVideoCall()
+                }
+            }
+        }
+    }
+
+    private func blockUser() {
+        guard !opponentUserId.isEmpty else { return }
+
         UserManager.shared.reportAndBlockUser(opponentUserId, reason: "사용자 차단")
-        print("✅ 사용자 신고 및 차단: \(opponentUserId)")
-        
-        // 차단 후 즉시 통화 종료
+        #if DEBUG
+        print("✅ User blocked: \(opponentUserId)")
+        #endif
+
         endVideoCall()
+    }
+
+    // MARK: - Error Handling
+
+    private func showError(_ message: String) {
+        errorMessage = message
+        showErrorAlert = true
     }
 }
