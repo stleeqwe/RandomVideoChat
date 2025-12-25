@@ -48,10 +48,28 @@
 		88ABCD001122334455667703 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667702 /* StoreKitManager.swift */; };
 		88ABCD001122334455667706 /* DailyRewardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ABCD001122334455667704 /* DailyRewardManager.swift */; };
 		88NET00012F0000001234567 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88NET00002F0000001234567 /* NetworkMonitor.swift */; };
-		88NQM00012F0000001234567 /* NetworkQualityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */; };
 		88TOK00012F0000001234567 /* TokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88TOK00002F0000001234567 /* TokenProvider.swift */; };
 		88CAM00012F0000001234567 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CAM00002F0000001234567 /* CameraManager.swift */; };
 		88TRM00012F0000001234567 /* TermsAgreementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88TRM00002F0000001234567 /* TermsAgreementView.swift */; };
+		88CRY00012F0000001234567 /* CryptoUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CRY00002F0000001234567 /* CryptoUtils.swift */; };
+		88KEY00012F0000001234567 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88KEY00002F0000001234567 /* KeychainManager.swift */; };
+		88ARC0012F1000001234567 /* CallTimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0002F1000001234567 /* CallTimerManager.swift */; };
+		88ARC0032F1000001234567 /* HeartObserverManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0022F1000001234567 /* HeartObserverManager.swift */; };
+		88ARC0052F1000001234567 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0042F1000001234567 /* AuthManager.swift */; };
+		88ARC0072F1000001234567 /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0062F1000001234567 /* ProfileManager.swift */; };
+		88ARC0092F1000001234567 /* BlockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0082F1000001234567 /* BlockManager.swift */; };
+		88ARC00B2F1000001234567 /* VideoCallViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC00A2F1000001234567 /* VideoCallViewModel.swift */; };
+		88ARC00D2F1000001234567 /* NetworkQualityIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC00C2F1000001234567 /* NetworkQualityIndicator.swift */; };
+		88ARC00F2F1000001234567 /* ConnectionStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC00E2F1000001234567 /* ConnectionStatusBanner.swift */; };
+		88ARC0112F1000001234567 /* CallControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0102F1000001234567 /* CallControlsView.swift */; };
+		88ARC0132F1000001234567 /* CallTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0122F1000001234567 /* CallTimerView.swift */; };
+		88ARC0152F1000001234567 /* ReportBlockButtonsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0142F1000001234567 /* ReportBlockButtonsView.swift */; };
+		88ARC0172F1000001234567 /* GradientBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0162F1000001234567 /* GradientBackgroundView.swift */; };
+		88ARC0192F1000001234567 /* FloatingParticlesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ARC0182F1000001234567 /* FloatingParticlesView.swift */; };
+		88ERR00012F2000001234567 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ERR00002F2000001234567 /* AppError.swift */; };
+		88MVM00012F2000001234567 /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88MVM00002F2000001234567 /* MainViewModel.swift */; };
+		88SVM00012F2000001234567 /* SignUpViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88SVM00002F2000001234567 /* SignUpViewModel.swift */; };
+		88NMG00012F3000001234567 /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88NMG00002F3000001234567 /* NetworkManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -110,10 +128,28 @@
 		88ABCD001122334455667702 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		88ABCD001122334455667704 /* DailyRewardManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRewardManager.swift; sourceTree = "<group>"; };
 		88NET00002F0000001234567 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
-		88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityMonitor.swift; sourceTree = "<group>"; };
 		88TOK00002F0000001234567 /* TokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenProvider.swift; sourceTree = "<group>"; };
 		88CAM00002F0000001234567 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		88TRM00002F0000001234567 /* TermsAgreementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsAgreementView.swift; sourceTree = "<group>"; };
+		88CRY00002F0000001234567 /* CryptoUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoUtils.swift; sourceTree = "<group>"; };
+		88KEY00002F0000001234567 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		88ARC0002F1000001234567 /* CallTimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallTimerManager.swift; sourceTree = "<group>"; };
+		88ARC0022F1000001234567 /* HeartObserverManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartObserverManager.swift; sourceTree = "<group>"; };
+		88ARC0042F1000001234567 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		88ARC0062F1000001234567 /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
+		88ARC0082F1000001234567 /* BlockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockManager.swift; sourceTree = "<group>"; };
+		88ARC00A2F1000001234567 /* VideoCallViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCallViewModel.swift; sourceTree = "<group>"; };
+		88ARC00C2F1000001234567 /* NetworkQualityIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityIndicator.swift; sourceTree = "<group>"; };
+		88ARC00E2F1000001234567 /* ConnectionStatusBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusBanner.swift; sourceTree = "<group>"; };
+		88ARC0102F1000001234567 /* CallControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallControlsView.swift; sourceTree = "<group>"; };
+		88ARC0122F1000001234567 /* CallTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallTimerView.swift; sourceTree = "<group>"; };
+		88ARC0142F1000001234567 /* ReportBlockButtonsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportBlockButtonsView.swift; sourceTree = "<group>"; };
+		88ARC0162F1000001234567 /* GradientBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientBackgroundView.swift; sourceTree = "<group>"; };
+		88ARC0182F1000001234567 /* FloatingParticlesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingParticlesView.swift; sourceTree = "<group>"; };
+		88ERR00002F2000001234567 /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
+		88MVM00002F2000001234567 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
+		88SVM00002F2000001234567 /* SignUpViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpViewModel.swift; sourceTree = "<group>"; };
+		88NMG00002F3000001234567 /* NetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +185,58 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		88ERR01A2F2000001234567 /* Errors */ = {
+			isa = PBXGroup;
+			children = (
+				88ERR00002F2000001234567 /* AppError.swift */,
+			);
+			path = Errors;
+			sourceTree = "<group>";
+		};
+		88ARC01A2F1000001234567 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				88ARC0002F1000001234567 /* CallTimerManager.swift */,
+				88ARC0022F1000001234567 /* HeartObserverManager.swift */,
+				88ARC0042F1000001234567 /* AuthManager.swift */,
+				88ARC0062F1000001234567 /* ProfileManager.swift */,
+				88ARC0082F1000001234567 /* BlockManager.swift */,
+			);
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		88ARC01B2F1000001234567 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				88ARC00A2F1000001234567 /* VideoCallViewModel.swift */,
+				88MVM00002F2000001234567 /* MainViewModel.swift */,
+				88SVM00002F2000001234567 /* SignUpViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		88ARC01C2F1000001234567 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				88ARC01D2F1000001234567 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		88ARC01D2F1000001234567 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				88ARC00C2F1000001234567 /* NetworkQualityIndicator.swift */,
+				88ARC00E2F1000001234567 /* ConnectionStatusBanner.swift */,
+				88ARC0102F1000001234567 /* CallControlsView.swift */,
+				88ARC0122F1000001234567 /* CallTimerView.swift */,
+				88ARC0142F1000001234567 /* ReportBlockButtonsView.swift */,
+				88ARC0162F1000001234567 /* GradientBackgroundView.swift */,
+				88ARC0182F1000001234567 /* FloatingParticlesView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		8871CC3E2E40DAB90096BD2F = {
 			isa = PBXGroup;
 			children = (
@@ -172,6 +260,10 @@
 		8871CC492E40DAB90096BD2F /* RandomVideoChat */ = {
 			isa = PBXGroup;
 			children = (
+				88ERR01A2F2000001234567 /* Errors */,
+				88ARC01A2F1000001234567 /* Managers */,
+				88ARC01B2F1000001234567 /* ViewModels */,
+				88ARC01C2F1000001234567 /* Views */,
 				883B1C802E55334A00143841 /* GoogleService-Info.plist */,
 				8889DB3E2E48C1CE0040E898 /* CarterOne-Regular.ttf */,
 				883B1C7E2E4AA68100143841 /* GoogleSansCode-VariableFont_wght.ttf */,
@@ -194,6 +286,7 @@
 				88IMG0002E70000001234567 /* ImageCacheManager.swift */,
 				88C07E242E4177A8004A3F93 /* User.swift */,
 				88C07E262E4177C0004A3F93 /* UserManager.swift */,
+				88NMG00002F3000001234567 /* NetworkManager.swift */,
 				88C07E282E4178D1004A3F93 /* MatchingManager.swift */,
 				88C07E332E4220B1004A3F93 /* AgoraVideoView.swift */,
 				88C07E352E422205004A3F93 /* AgoraManager.swift */,
@@ -204,10 +297,11 @@
 				88ABCD001122334455667702 /* StoreKitManager.swift */,
 				88ABCD001122334455667704 /* DailyRewardManager.swift */,
 				88NET00002F0000001234567 /* NetworkMonitor.swift */,
-				88NQM00002F0000001234567 /* NetworkQualityMonitor.swift */,
 				88TOK00002F0000001234567 /* TokenProvider.swift */,
 				88CAM00002F0000001234567 /* CameraManager.swift */,
 				88TRM00002F0000001234567 /* TermsAgreementView.swift */,
+				88CRY00002F0000001234567 /* CryptoUtils.swift */,
+				88KEY00002F0000001234567 /* KeychainManager.swift */,
 			);
 			path = RandomVideoChat;
 			sourceTree = "<group>";
@@ -409,10 +503,28 @@
 				88ABCD001122334455667703 /* StoreKitManager.swift in Sources */,
 				88ABCD001122334455667706 /* DailyRewardManager.swift in Sources */,
 				88NET00012F0000001234567 /* NetworkMonitor.swift in Sources */,
-				88NQM00012F0000001234567 /* NetworkQualityMonitor.swift in Sources */,
 				88TOK00012F0000001234567 /* TokenProvider.swift in Sources */,
 				88CAM00012F0000001234567 /* CameraManager.swift in Sources */,
 				88TRM00012F0000001234567 /* TermsAgreementView.swift in Sources */,
+				88CRY00012F0000001234567 /* CryptoUtils.swift in Sources */,
+				88KEY00012F0000001234567 /* KeychainManager.swift in Sources */,
+				88ARC0012F1000001234567 /* CallTimerManager.swift in Sources */,
+				88ARC0032F1000001234567 /* HeartObserverManager.swift in Sources */,
+				88ARC0052F1000001234567 /* AuthManager.swift in Sources */,
+				88ARC0072F1000001234567 /* ProfileManager.swift in Sources */,
+				88ARC0092F1000001234567 /* BlockManager.swift in Sources */,
+				88ARC00B2F1000001234567 /* VideoCallViewModel.swift in Sources */,
+				88ARC00D2F1000001234567 /* NetworkQualityIndicator.swift in Sources */,
+				88ARC00F2F1000001234567 /* ConnectionStatusBanner.swift in Sources */,
+				88ARC0112F1000001234567 /* CallControlsView.swift in Sources */,
+				88ARC0132F1000001234567 /* CallTimerView.swift in Sources */,
+				88ARC0152F1000001234567 /* ReportBlockButtonsView.swift in Sources */,
+				88ARC0172F1000001234567 /* GradientBackgroundView.swift in Sources */,
+				88ARC0192F1000001234567 /* FloatingParticlesView.swift in Sources */,
+				88ERR00012F2000001234567 /* AppError.swift in Sources */,
+				88MVM00012F2000001234567 /* MainViewModel.swift in Sources */,
+				88SVM00012F2000001234567 /* SignUpViewModel.swift in Sources */,
+				88NMG00012F3000001234567 /* NetworkManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

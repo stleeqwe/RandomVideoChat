@@ -17,88 +17,12 @@ struct MatchingView: View {
     
     var body: some View {
         ZStack {
-            // Enhanced purple gradient background
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(.sRGB, red: 0.05, green: 0.02, blue: 0.15), location: 0.0),
-                        .init(color: Color(.sRGB, red: 0.12, green: 0.06, blue: 0.25), location: 0.3),
-                        .init(color: Color(.sRGB, red: 0.20, green: 0.10, blue: 0.35), location: 0.7),
-                        .init(color: Color(.sRGB, red: 0.08, green: 0.03, blue: 0.18), location: 1.0)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-                // Enhanced radial purple accent
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(.sRGB, red: 0.4, green: 0.2, blue: 0.6).opacity(0.6),
-                        Color(.sRGB, red: 0.3, green: 0.15, blue: 0.5).opacity(0.3),
-                        Color.clear
-                    ]),
-                    center: .center,
-                    startRadius: 80,
-                    endRadius: 400
-                )
-                
-                // Additional purple glow spots
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(.sRGB, red: 0.5, green: 0.3, blue: 0.8).opacity(0.4),
-                        Color.clear
-                    ]),
-                    center: .topTrailing,
-                    startRadius: 50,
-                    endRadius: 250
-                )
-                
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(.sRGB, red: 0.6, green: 0.2, blue: 0.7).opacity(0.3),
-                        Color.clear
-                    ]),
-                    center: .bottomLeading,
-                    startRadius: 60,
-                    endRadius: 300
-                )
-            }
-            .ignoresSafeArea()
-            
-            // Enhanced floating particles with varied behavior
-            GeometryReader { geometry in
-                ForEach(0..<15, id: \.self) { index in
-                    let size = CGFloat.random(in: 4...12)
-                    let baseOpacity = Double.random(in: 0.05...0.15)
-                    
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(baseOpacity),
-                                    Color(.sRGB, red: 0.7, green: 0.4, blue: 0.9).opacity(baseOpacity * 0.8)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: size, height: size)
-                        .position(
-                            x: CGFloat.random(in: 0...geometry.size.width),
-                            y: CGFloat.random(in: 0...geometry.size.height)
-                        )
-                        .blur(radius: CGFloat.random(in: 2...6))
-                        .opacity(pulseAnimation ? 0.8 : 0.3)
-                        .scaleEffect(pulseAnimation ? 1.4 : 0.6)
-                        .animation(
-                            .easeInOut(duration: Double.random(in: 2...4))
-                                .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.2),
-                            value: pulseAnimation
-                        )
-                }
-            }
-            
+            // Gradient background
+            GradientBackgroundView(style: .matching)
+
+            // Floating particles
+            FloatingParticlesView(style: .matching, animationTrigger: $pulseAnimation)
+
             VStack {
                 Spacer()
                 

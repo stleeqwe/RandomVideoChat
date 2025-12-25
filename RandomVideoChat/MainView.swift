@@ -1,38 +1,62 @@
 import SwiftUI
-import FirebaseAuth
 import AVFoundation
 
 @available(iOS 15.0, *)
 struct MainView: View {
-    // Main screen preview should not depend on in-call camera state
     @AppStorage("isMainPreviewOn") private var isMainPreviewOn: Bool = true
-    @AppStorage("heartCount") private var heartCount: Int = 3  // 기본 하트 개수
-    @State private var showMatchingView = false
-    @StateObject private var userManager = UserManager.shared
-    @State private var permissionsGranted = false
+    @StateObject private var viewModel = MainViewModel()
     @State private var swipeOffset: CGFloat = 0
     @State private var showSwipeHint = true
-    @State private var showPermissionAlert = false
-    @State private var permissionMessage = ""
-    @State private var showSettings = false
-    @State private var showDailyRewardAlert = false
-    @State private var dailyRewardMessage = ""
-    
-    // 로컬 성별 상태 관리
-    @State private var myGender: Gender?
-    @State private var preferredGender: Gender?
-    
-    // Scene phase for lifecycle management
     @Environment(\.scenePhase) private var scenePhase
-    
+
     var body: some View {
         ZStack {
+            // Camera preview or placeholder
+            cameraPreviewLayer
+
+            // Gradient overlay
+            gradientOverlay
+
+            // Main content
+            mainContent
+
+            // Debug info (development only)
+            #if DEBUG
+            debugOverlay
+            #endif
+        }
+        .animation(.none, value: isMainPreviewOn)
+        .gesture(swipeGesture)
+        .alert(isPresented: $viewModel.showPermissionAlert) {
+            permissionAlert
+        }
+        .onAppear {
+            viewModel.onAppear(isMainPreviewOn: isMainPreviewOn)
+        }
+        .alert("출석 보상", isPresented: $viewModel.showDailyRewardAlert) {
+            Button("확인") { }
+        } message: {
+            Text(viewModel.dailyRewardMessage)
+        }
+        .onChange(of: scenePhase) { newPhase in
+            viewModel.handleScenePhase(newPhase, isMainPreviewOn: isMainPreviewOn)
+        }
+        .fullScreenCover(isPresented: $viewModel.showMatchingView) {
+            MatchingView(isPresented: $viewModel.showMatchingView)
+        }
+        .sheet(isPresented: $viewModel.showSettings) {
+            SettingsView()
+        }
+    }
+
+    // MARK: - View Components
+
+    private var cameraPreviewLayer: some View {
+        Group {
             if isMainPreviewOn {
-                // 개선된 카메라 프리뷰 사용
                 ImprovedCameraPreview(isOn: $isMainPreviewOn)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // 카메라 off 상태 기본 프로필 화면
                 ZStack {
                     Color.black.ignoresSafeArea()
                     Image(systemName: "person.crop.circle.fill")
@@ -40,398 +64,227 @@ struct MainView: View {
                         .foregroundColor(.white.opacity(0.3))
                 }
             }
-            
-            // 전체 화면 카메라 오버레이 (상단과 하단에 그라데이션 적용)
-            LinearGradient(
-                gradient: Gradient(stops: [
-                    .init(color: Color.black.opacity(0.4), location: 0.0),  // 상단 어두움
-                    .init(color: Color.black.opacity(0.05), location: 0.25), // 중간 위쪽 밝음
-                    .init(color: Color.black.opacity(0.02), location: 0.5),  // 중앙 완전 밝음
-                    .init(color: Color.black.opacity(0.05), location: 0.75), // 중간 아래쪽 밝음
-                    .init(color: Color.black.opacity(0.7), location: 1.0)    // 하단 어두움
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            // 카메라 on/off 전환 시 레이아웃/뷰 전환 애니메이션 제거
-            .animation(.none, value: isMainPreviewOn)
-            
-            VStack {
-                // 상단 버튼들
-                HStack {
-                    Spacer()
-                    
-                    
-                    // 설정 버튼
-                    Button(action: { showSettings = true }) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.top, 50)
-                    .padding(.trailing, 20)
-                }
-                
+        }
+    }
+
+    private var gradientOverlay: some View {
+        LinearGradient(
+            gradient: Gradient(stops: [
+                .init(color: Color.black.opacity(0.4), location: 0.0),
+                .init(color: Color.black.opacity(0.05), location: 0.25),
+                .init(color: Color.black.opacity(0.02), location: 0.5),
+                .init(color: Color.black.opacity(0.05), location: 0.75),
+                .init(color: Color.black.opacity(0.7), location: 1.0)
+            ]),
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+        .animation(.none, value: isMainPreviewOn)
+    }
+
+    private var mainContent: some View {
+        VStack {
+            // Top bar with settings
+            HStack {
                 Spacer()
-                
-                HStack {
-                    // 성별 선택 UI (좌측)
-                    VStack(spacing: 20) {
-                        GenderSelectionView(
-                            title: "내 성별",
-                            isRequired: true,
-                            selectedGender: $myGender,
-                            onGenderSelected: { gender in
-                                myGender = gender
-                                userManager.updateGender(gender)
-                            }
-                        )
-                        
-                        GenderSelectionView(
-                            title: "선호 성별",
-                            isRequired: false,
-                            selectedGender: $preferredGender,
-                            onGenderSelected: { gender in
-                                // 선호 성별은 토글 가능 - 같은 성별 재선택 시 해제
-                                if preferredGender == gender {
-                                    preferredGender = nil
-                                    userManager.updatePreferredGender(nil)
-                                } else {
-                                    preferredGender = gender
-                                    userManager.updatePreferredGender(gender)
-                                }
-                            }
-                        )
-                    }
-                    .padding(.leading, 20)
-                    
-                    Spacer()
-                    
-                    // 카메라 아이콘과 하트 카운터 (우측 상단)
-            VStack(spacing: 12) {
-                        Button(action: {
-                            // Disable animation for instant switch
-                            withAnimation(.none) {
-                                isMainPreviewOn.toggle()
-                            }
-                        }) {
-                            Image(systemName: isMainPreviewOn ? "camera.fill" : "camera")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white)
-                        }
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "heart.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(.red)
-                            Text("X  \(heartCount)")
-                                .font(.custom("Carter One", size: 22))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .padding(.trailing, 20)
-                }
-                .padding(.bottom, 30)
-                
-                // 인터랙티브 스와이프 인디케이터 (중앙 하단)
-                VStack(spacing: 16) {
-                    // 순차적으로 나타나는 상향 화살표
-                    VStack(spacing: 6) {
-                        ForEach(0..<3, id: \.self) { index in
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(.white)
-                                .opacity(showSwipeHint ? 1.0 : 0.3)
-                                .scaleEffect(showSwipeHint ? 1.0 : 0.7)
-                                .animation(
-                                    .easeInOut(duration: 0.6)
-                                        .repeatForever(autoreverses: true)
-                                        .delay(Double(index) * 0.2),
-                                    value: showSwipeHint
-                                )
-                        }
-                    }
-                    .offset(y: swipeOffset)
-                    
-                    Text("SWIPE UP & START")
-                        .font(.custom("Carter One", size: 20))
+                Button(action: { viewModel.showSettings = true }) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 24))
                         .foregroundColor(.white)
                 }
-                .padding(.bottom, 70)
-                .onAppear {
-                    // Enhanced floating animation
-                    withAnimation(
-                        .easeInOut(duration: 2.0)
-                            .repeatForever(autoreverses: true)
-                    ) {
-                        swipeOffset = -15
-                    }
-                    
-                    // Pulsing hint animation
-                    withAnimation(
-                        .easeInOut(duration: 3.0)
-                            .repeatForever(autoreverses: true)
-                    ) {
-                        showSwipeHint.toggle()
-                    }
+                .accessibilityLabel("설정")
+                .accessibilityHint("설정 화면을 엽니다")
+                .padding(.top, 50)
+                .padding(.trailing, 20)
+            }
+
+            Spacer()
+
+            // Gender selection and controls
+            HStack {
+                genderSelectionPanel
+                Spacer()
+                controlsPanel
+            }
+            .padding(.bottom, 30)
+
+            // Swipe indicator
+            swipeIndicator
+        }
+    }
+
+    private var genderSelectionPanel: some View {
+        VStack(spacing: 20) {
+            GenderSelectionView(
+                title: "내 성별",
+                isRequired: true,
+                selectedGender: $viewModel.myGender,
+                onGenderSelected: { viewModel.updateMyGender($0) }
+            )
+
+            GenderSelectionView(
+                title: "선호 성별",
+                isRequired: false,
+                selectedGender: $viewModel.preferredGender,
+                onGenderSelected: { viewModel.updatePreferredGender($0) }
+            )
+        }
+        .padding(.leading, 20)
+    }
+
+    private var controlsPanel: some View {
+        VStack(spacing: 12) {
+            Button(action: {
+                withAnimation(.none) {
+                    isMainPreviewOn.toggle()
+                }
+            }) {
+                Image(systemName: isMainPreviewOn ? "camera.fill" : "camera")
+                    .font(.system(size: 28))
+                    .foregroundColor(.white)
+            }
+            .accessibilityLabel(isMainPreviewOn ? "카메라 끄기" : "카메라 켜기")
+            .accessibilityHint("카메라 프리뷰를 토글합니다")
+
+            HStack(spacing: 4) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(.red)
+                Text("X  \(viewModel.heartCount)")
+                    .font(.custom("Carter One", size: 22))
+                    .foregroundColor(.white)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("보유 하트 \(viewModel.heartCount)개")
+        }
+        .padding(.trailing, 20)
+    }
+
+    private var swipeIndicator: some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 6) {
+                ForEach(0..<3, id: \.self) { index in
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                        .opacity(showSwipeHint ? 1.0 : 0.3)
+                        .scaleEffect(showSwipeHint ? 1.0 : 0.7)
+                        .animation(
+                            .easeInOut(duration: 0.6)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.2),
+                            value: showSwipeHint
+                        )
                 }
             }
-            
-            // 🆕 디버그 정보 (개발용)
-            #if DEBUG
-            VStack {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("세션 제외: \(UserManager.shared.getRecentMatchesCount())명")
-                            .font(.caption2)
-                        
-                        let blockedCount = UserManager.shared.currentUser?.blockedUsers.count ?? 0
-                        Text("영구 차단: \(blockedCount)명")
-                            .font(.caption2)
-                        // 선호도 기반 매칭 디버그 정보
-                        let prefRate = UserManager.shared.currentUser?.preferenceRate ?? 50.0
-                        let totalCalls = UserManager.shared.currentUser?.totalCallCount ?? 0
-                        Text(String(format: "선호도: %.1f%%", prefRate))
-                            .font(.caption2)
-                        Text("통화 횟수: \(totalCalls)회")
-                            .font(.caption2)
-                    }
-                    .padding(5)
-                    .background(Color.black.opacity(0.7))
-                    .foregroundColor(.white)
-                    .cornerRadius(5)
-                    
-                    Spacer()
+            .offset(y: swipeOffset)
+            .accessibilityHidden(true)
+
+            Text("SWIPE UP & START")
+                .font(.custom("Carter One", size: 20))
+                .foregroundColor(.white)
+        }
+        .padding(.bottom, 70)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("위로 스와이프하여 매칭 시작")
+        .accessibilityHint("화면을 위로 스와이프하면 랜덤 매칭이 시작됩니다")
+        .accessibilityAddTraits(.startsMediaSession)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                swipeOffset = -15
+            }
+            withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
+                showSwipeHint.toggle()
+            }
+        }
+    }
+
+    #if DEBUG
+    private var debugOverlay: some View {
+        VStack {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("세션 제외: \(viewModel.debugSessionExcludedCount)명")
+                        .font(.caption2)
+                    Text("영구 차단: \(viewModel.debugBlockedCount)명")
+                        .font(.caption2)
+                    Text(String(format: "선호도: %.1f%%", viewModel.debugPreferenceRate))
+                        .font(.caption2)
+                    Text("통화 횟수: \(viewModel.debugTotalCalls)회")
+                        .font(.caption2)
                 }
-                .padding(.top, 60)
-                .padding(.horizontal)
-                
+                .padding(5)
+                .background(Color.black.opacity(0.7))
+                .foregroundColor(.white)
+                .cornerRadius(5)
+
                 Spacer()
             }
-            #endif
-        }
-        // Disable implicit animations for this state change
-        .animation(.none, value: isMainPreviewOn)
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    // 위로 스와이프 감지
-                    if value.translation.height < -50 {
-                        print("⬆️ 스와이프 감지 - 검증 중...")
-                        
-                        // 성별 선택 확인
-                        if userManager.currentUser?.gender != nil {
-                            print("✅ 모든 조건 충족 - 매칭 화면 표시")
-                            // 매칭 화면 진입 시에는 카메라 세션을 유지합니다.
-                            // 실제 통화 화면(VideoCallView) 진입 시에만 세션을 중지하여 버벅임을 방지합니다.
-                            showMatchingView = true
-                        } else {
-                            print("❌ 성별 선택 필요 - 알림 표시")
-                            permissionMessage = "매칭을 시작하려면 먼저 성별을 선택해주세요."
-                            showPermissionAlert = true
-                        }
-                    }
-                }
-        )
-        .alert(isPresented: $showPermissionAlert) {
-            if permissionMessage.contains("성별") {
-                // 성별 선택 알림
-                Alert(title: Text("성별 선택 필요"),
-                      message: Text(permissionMessage),
-                      dismissButton: .default(Text("확인")))
-            } else {
-                // 권한 관련 알림
-                Alert(title: Text("권한 필요"),
-                      message: Text(permissionMessage),
-                      primaryButton: .default(Text("설정 열기"), action: {
-                          openSettings()
-                      }),
-                      secondaryButton: .cancel(Text("닫기")))
-            }
-        }
-        .onAppear {
-            // 로컬 상태를 UserManager의 현재 값으로 초기화
-            myGender = userManager.currentUser?.gender
-            preferredGender = userManager.currentUser?.preferredGender
+            .padding(.top, 60)
+            .padding(.horizontal)
 
-            // 현재 사용자 데이터 로드
-            if let uid = Auth.auth().currentUser?.uid {
-                userManager.loadCurrentUser(uid: uid)
-            }
-
-            // 권한 요청 (중복 방지)
-            requestCameraAndMicrophonePermissions()
-            
-            // 메인 화면 진입 시 Agora 로컬 프리뷰가 켜져 있다면 중지하여 카메라 충돌 방지
-            AgoraManager.shared.stopLocalPreviewIfIdle()
-
-            // 카메라 매니저 초기화 및 시작
-            if isMainPreviewOn {
-                CameraManager.shared.resumeSession()
-            }
-
-            // 일일 출석 보상 체크
-            DailyRewardManager.shared.checkAndGrantDailyReward { granted, message in
-                if granted, let message = message {
-                    DispatchQueue.main.async {
-                        self.dailyRewardMessage = message
-                        self.showDailyRewardAlert = true
-                    }
-                }
-            }
-        }
-        .alert("출석 보상", isPresented: $showDailyRewardAlert) {
-            Button("확인") { }
-        } message: {
-            Text(dailyRewardMessage)
-        }
-        .onChange(of: scenePhase) { newPhase in
-            switch newPhase {
-            case .active:
-                // App became active - resume camera if needed
-                print("📱 ScenePhase: active (main preview on: \(isMainPreviewOn))")
-                if isMainPreviewOn && !showMatchingView {
-                    CameraManager.shared.resumeSession()
-                }
-            case .inactive:
-                // Do not stop session on inactive (e.g., permission prompts)
-                print("📱 ScenePhase: inactive (no-op)")
-            case .background:
-                // App went to background - stop camera
-                print("📱 ScenePhase: background -> stop camera session")
-                CameraManager.shared.stopSession()
-            @unknown default:
-                break
-            }
-        }
-        .onReceive(userManager.$currentUser) { user in
-            // Firestore에서 가져온 값 우선 사용
-            if let user = user {
-                heartCount = user.heartCount
-                
-                // 로컬 성별 상태도 동기화
-                myGender = user.gender
-                preferredGender = user.preferredGender
-            } else {
-                // Firestore에 데이터가 없으면 기본값 사용
-                heartCount = 3
-            }
-        }
-        // 중요: fullScreenCover 추가
-        .fullScreenCover(isPresented: $showMatchingView, onDismiss: {
-            // 매칭 화면 종료 시 카메라 재시작은 CameraPreview 내부에서 처리
-        }) {
-            MatchingView(isPresented: $showMatchingView)
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
+            Spacer()
         }
     }
-    
-    // MARK: - Unified permission flow
-    func requestCameraAndMicrophonePermissions() {
-        func status(_ mediaType: AVMediaType) -> AVAuthorizationStatus {
-            AVCaptureDevice.authorizationStatus(for: mediaType)
-        }
-        func request(_ mediaType: AVMediaType, _ completion: @escaping (Bool) -> Void) {
-            AVCaptureDevice.requestAccess(for: mediaType) { granted in
-                completion(granted)
-            }
-        }
+    #endif
 
-        let videoStatus = status(.video)
-        let audioStatus = status(.audio)
+    // MARK: - Gestures & Alerts
 
-        if videoStatus == .authorized && audioStatus == .authorized {
-            permissionsGranted = true
-            return
-        }
-
-        // Request missing permissions sequentially to avoid duplicate prompts
-        if videoStatus == .notDetermined {
-            request(.video) { granted in
-                if !granted {
-                    DispatchQueue.main.async {
-                        permissionMessage = "카메라 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                        showPermissionAlert = true
-                    }
-                    return
-                }
-                // After camera, request mic if needed
-                let micStatus = status(.audio)
-                if micStatus == .notDetermined {
-                    request(.audio) { micGranted in
-                        DispatchQueue.main.async {
-                            self.permissionsGranted = micGranted
-                            if !micGranted {
-                                permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                                showPermissionAlert = true
-                            }
-                        }
-                    }
-                } else {
-                    DispatchQueue.main.async {
-                        self.permissionsGranted = (micStatus == .authorized)
-                        if micStatus != .authorized {
-                            permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                            showPermissionAlert = true
-                        }
-                    }
+    private var swipeGesture: some Gesture {
+        DragGesture()
+            .onEnded { value in
+                if value.translation.height < -50 {
+                    viewModel.handleSwipeUp()
                 }
             }
+    }
+
+    private var permissionAlert: Alert {
+        if viewModel.permissionMessage.contains("성별") {
+            return Alert(
+                title: Text("성별 선택 필요"),
+                message: Text(viewModel.permissionMessage),
+                dismissButton: .default(Text("확인"))
+            )
         } else {
-            // Camera already determined; handle mic
-            if audioStatus == .notDetermined {
-                request(.audio) { micGranted in
-                    DispatchQueue.main.async {
-                        self.permissionsGranted = (videoStatus == .authorized) && micGranted
-                        if !micGranted {
-                            permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                            showPermissionAlert = true
-                        }
-                    }
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.permissionsGranted = (videoStatus == .authorized) && (audioStatus == .authorized)
-                    if !self.permissionsGranted {
-                        permissionMessage = "카메라/마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                        showPermissionAlert = true
-                    }
-                }
-            }
+            return Alert(
+                title: Text("권한 필요"),
+                message: Text(viewModel.permissionMessage),
+                primaryButton: .default(Text("설정 열기"), action: {
+                    viewModel.openSettings()
+                }),
+                secondaryButton: .cancel(Text("닫기"))
+            )
         }
-    }
-    
-    func openSettings() {
-        guard let url = URL(string: UIApplication.openSettingsURLString),
-              UIApplication.shared.canOpenURL(url) else { return }
-        UIApplication.shared.open(url)
     }
 }
 
 // MARK: - Gender Selection Component
+
 struct GenderSelectionView: View {
     let title: String
     let isRequired: Bool
     @Binding var selectedGender: Gender?
     let onGenderSelected: (Gender) -> Void
-    
+
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 4) {
                 Text(title)
                     .font(.custom("GoogleSansCode", size: 14))
                     .foregroundColor(.white)
-                
+
                 if isRequired {
                     Text("*")
                         .font(.custom("GoogleSansCode", size: 14))
                         .foregroundColor(.red)
+                        .accessibilityLabel("필수")
                 }
             }
-            
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(isRequired ? "\(title), 필수 항목" : title)
+
             HStack(spacing: 12) {
                 ForEach(Gender.allCases, id: \.self) { gender in
                     Button(action: {
@@ -442,17 +295,20 @@ struct GenderSelectionView: View {
                                 Circle()
                                     .fill(selectedGender == gender ? Color.white : Color.white.opacity(0.3))
                                     .frame(width: 40, height: 40)
-                                
+
                                 Image(systemName: gender.icon)
                                     .font(.system(size: 20, weight: .medium))
                                     .foregroundColor(selectedGender == gender ? .black : .white)
                             }
-                            
+
                             Text(gender.displayName)
                                 .font(.custom("GoogleSansCode", size: 12))
                                 .foregroundColor(selectedGender == gender ? .white : .white.opacity(0.7))
                         }
                     }
+                    .accessibilityLabel("\(title) \(gender.displayName)")
+                    .accessibilityHint(selectedGender == gender ? "선택됨" : "탭하여 선택")
+                    .accessibilityAddTraits(selectedGender == gender ? [.isButton, .isSelected] : .isButton)
                     .scaleEffect(selectedGender == gender ? 1.1 : 1.0)
                     .animation(.easeInOut(duration: 0.1), value: selectedGender)
                 }

@@ -10,32 +10,9 @@ struct SplashView: View {
     
     var body: some View {
         ZStack {
-            // Subtle purple gradient background
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(.sRGB, red: 0.03, green: 0.01, blue: 0.08), location: 0.0),
-                        .init(color: Color(.sRGB, red: 0.06, green: 0.03, blue: 0.12), location: 0.4),
-                        .init(color: Color(.sRGB, red: 0.08, green: 0.04, blue: 0.15), location: 0.8),
-                        .init(color: Color(.sRGB, red: 0.04, green: 0.02, blue: 0.09), location: 1.0)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-                // Very subtle radial accent
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(.sRGB, red: 0.2, green: 0.1, blue: 0.3).opacity(0.3),
-                        Color.clear
-                    ]),
-                    center: .center,
-                    startRadius: 100,
-                    endRadius: 500
-                )
-            }
-            .ignoresSafeArea()
-            
+            // Background gradient
+            GradientBackgroundView(style: .splash)
+
             // 5SEC Logo with Carter One font
             VStack(spacing: -50) {
                 Text("5")

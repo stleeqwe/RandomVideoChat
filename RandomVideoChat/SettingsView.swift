@@ -2,6 +2,13 @@ import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
 
+// MARK: - URL Constants
+private enum SettingsURL {
+    static let terms: URL? = URL(string: "https://5sec-terms.web.app/terms")
+    static let privacy: URL? = URL(string: "https://5sec-terms.web.app/privacy")
+    static let support: URL? = URL(string: "mailto:support@5sec-app.com")
+}
+
 @available(iOS 15.0, *)
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -41,38 +48,44 @@ struct SettingsView: View {
                 
                 Section {
                     // 이용약관
-                    Link(destination: URL(string: "https://5sec-terms.web.app/terms")!) {
-                        HStack {
-                            Image(systemName: "doc.text")
-                                .foregroundColor(.blue)
-                            Text("이용약관")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.gray)
+                    if let termsURL = SettingsURL.terms {
+                        Link(destination: termsURL) {
+                            HStack {
+                                Image(systemName: "doc.text")
+                                    .foregroundColor(.blue)
+                                Text("이용약관")
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
-                    
+
                     // 개인정보처리방침
-                    Link(destination: URL(string: "https://5sec-terms.web.app/privacy")!) {
-                        HStack {
-                            Image(systemName: "lock.shield")
-                                .foregroundColor(.blue)
-                            Text("개인정보처리방침")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.gray)
+                    if let privacyURL = SettingsURL.privacy {
+                        Link(destination: privacyURL) {
+                            HStack {
+                                Image(systemName: "lock.shield")
+                                    .foregroundColor(.blue)
+                                Text("개인정보처리방침")
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
-                    
+
                     // 문의하기
-                    Link(destination: URL(string: "mailto:support@5sec-app.com")!) {
-                        HStack {
-                            Image(systemName: "envelope")
-                                .foregroundColor(.blue)
-                            Text("문의하기")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.gray)
+                    if let supportURL = SettingsURL.support {
+                        Link(destination: supportURL) {
+                            HStack {
+                                Image(systemName: "envelope")
+                                    .foregroundColor(.blue)
+                                Text("문의하기")
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
                 } header: {

@@ -186,25 +186,3 @@ class ContentModerationManager: ObservableObject {
         }
     }
 }
-
-// MARK: - Moderation Extensions for UserManager
-extension UserManager {
-    func reportAndBlockUser(_ userId: String, reason: String) {
-        // 1. 신고 접수
-        ContentModerationManager.shared.reportUser(reportedUserId: userId, reason: reason) { success in
-            if success {
-                print("✅ 신고 및 차단 완료: \(userId)")
-            }
-        }
-        
-        // 2. 개인 차단 목록에 추가
-        blockUser(userId)
-    }
-    
-    func checkContentSafety(completion: @escaping (Bool, String?) -> Void) {
-        // NOTE: Client-side Firestore reads for reports/suspensions can violate rules for normal users.
-        // To avoid permission errors in production, perform moderation checks server-side (Cloud Functions)
-        // or store a derived flag in the user's document. For now, allow matching.
-        completion(true, nil)
-    }
-}

@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 @available(iOS 15.0, *)
 struct TermsAgreementView: View {
@@ -23,11 +24,11 @@ struct TermsAgreementView: View {
                 // Header
                 VStack(spacing: 12) {
                     Text("5sec")
-                        .font(.system(size: 48, weight: .bold))
+                        .font(.custom("Carter One", size: 48))
                         .foregroundColor(.white)
 
                     Text("서비스 이용을 위해\n약관에 동의해주세요")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.custom("GoogleSansCode-Regular", size: 18).weight(.medium))
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
                 }
@@ -51,7 +52,7 @@ struct TermsAgreementView: View {
                                 .foregroundColor(allAgreed ? .green : .gray)
 
                             Text("전체 동의")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.custom("GoogleSansCode-Regular", size: 18).weight(.semibold))
                                 .foregroundColor(.white)
 
                             Spacer()
@@ -89,7 +90,7 @@ struct TermsAgreementView: View {
                                 .foregroundColor(agreedToAge ? .green : .gray)
 
                             Text("[필수] 만 18세 이상입니다")
-                                .font(.system(size: 16))
+                                .font(.custom("GoogleSansCode-Regular", size: 16))
                                 .foregroundColor(.white)
 
                             Spacer()
@@ -111,7 +112,7 @@ struct TermsAgreementView: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: .black))
                     } else {
                         Text("동의하고 시작하기")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.custom("GoogleSansCode-Regular", size: 18).weight(.bold))
                             .foregroundColor(.black)
                     }
                 }
@@ -164,7 +165,7 @@ struct AgreementRow: View {
             }
 
             Text(title)
-                .font(.system(size: 16))
+                .font(.custom("GoogleSansCode-Regular", size: 16))
                 .foregroundColor(.white)
 
             Spacer()
@@ -195,6 +196,7 @@ struct TermsDetailView: View {
                     WebViewWrapper(url: url)
                 } else {
                     Text("약관을 불러올 수 없습니다")
+                        .font(.custom("GoogleSansCode-Regular", size: 16))
                         .foregroundColor(.gray)
                 }
             }
@@ -205,14 +207,13 @@ struct TermsDetailView: View {
                     Button("닫기") {
                         dismiss()
                     }
+                    .font(.custom("GoogleSansCode-Regular", size: 16))
                     .foregroundColor(.white)
                 }
             }
         }
     }
 }
-
-import WebKit
 
 struct WebViewWrapper: UIViewRepresentable {
     let url: URL

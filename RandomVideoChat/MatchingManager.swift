@@ -25,15 +25,6 @@ enum MatchingState: Equatable {
     }
 }
 
-enum MatchingError: Error, Equatable {
-    case notAuthenticated
-    case networkError
-    case queueFull
-    case serverError
-    case timeout
-    case cancelled
-}
-
 // MARK: - MatchingManager
 /// Production-grade MatchingManager
 /// Responsibilities:
@@ -199,8 +190,8 @@ final class MatchingManager: ObservableObject {
         resetMatchState()
         updateState(.idle)
 
-        // Clear UserDefaults
-        clearMatchingUserDefaults()
+        // Clear Keychain data
+        clearMatchingData()
     }
 
     // MARK: - Queue Registration (Server-Side Matching)
@@ -225,6 +216,17 @@ final class MatchingManager: ObservableObject {
             "timestamp": ServerValue.timestamp(),
             "clientVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         ]
+
+        #if DEBUG
+        print("═══════════════════════════════════════")
+        print("📤 REGISTERING IN QUEUE")
+        print("   User ID: \(userId)")
+        print("   Gender: \(userGender)")
+        print("   Preferred: \(preferredGender)")
+        print("   Bucket: \(bucket)")
+        print("   Data: \(queueData)")
+        print("═══════════════════════════════════════")
+        #endif
 
         // Register in queue
         queueRef.setValue(queueData) { [weak self] error, _ in
@@ -313,9 +315,9 @@ final class MatchingManager: ObservableObject {
                 self.currentChannelName = channelName
                 self.matchedUserId = matchedWith
 
-                // Save to UserDefaults for recovery
-                UserDefaults.standard.set(channelName, forKey: "currentChannelName")
-                UserDefaults.standard.set(matchId, forKey: "currentMatchId")
+                // Save to Keychain for secure recovery
+                _ = KeychainManager.save(channelName, forKey: .currentChannelName)
+                _ = KeychainManager.save(matchId, forKey: .currentMatchId)
 
                 // Record in session history
                 UserManager.shared.addRecentMatch(matchedWith)
@@ -383,8 +385,9 @@ final class MatchingManager: ObservableObject {
         self.isMatched = true
         self.isMatching = false
 
-        UserDefaults.standard.set(channelName, forKey: "currentChannelName")
-        UserDefaults.standard.set(matchId, forKey: "currentMatchId")
+        // Save to Keychain for secure storage
+        _ = KeychainManager.save(channelName, forKey: .currentChannelName)
+        _ = KeychainManager.save(matchId, forKey: .currentMatchId)
         UserManager.shared.addRecentMatch(matchedUserId)
     }
 
@@ -407,7 +410,7 @@ final class MatchingManager: ObservableObject {
 
     // MARK: - Call Timer Sync
     func updateCallTimer(_ seconds: Int) {
-        guard let matchId = currentMatchId ?? UserDefaults.standard.string(forKey: "currentMatchId"),
+        guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               !matchId.isEmpty else {
             #if DEBUG
             print("❌ Cannot update timer: no matchId")
@@ -423,7 +426,7 @@ final class MatchingManager: ObservableObject {
     }
 
     func observeCallTimer(completion: @escaping (Int) -> Void) {
-        guard let matchId = currentMatchId ?? UserDefaults.standard.string(forKey: "currentMatchId"),
+        guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               !matchId.isEmpty else {
             #if DEBUG
             print("❌ Cannot observe timer: no matchId")
@@ -446,7 +449,7 @@ final class MatchingManager: ObservableObject {
 
     // MARK: - Call End Signaling
     func signalCallEnd() {
-        guard let matchId = currentMatchId ?? UserDefaults.standard.string(forKey: "currentMatchId"),
+        guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               !matchId.isEmpty else {
             #if DEBUG
             print("⚠️ signalCallEnd: no matchId available")
@@ -516,7 +519,7 @@ final class MatchingManager: ObservableObject {
     }
 
     func observeCallEnd(completion: @escaping () -> Void) {
-        guard let matchId = currentMatchId ?? UserDefaults.standard.string(forKey: "currentMatchId"),
+        guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               !matchId.isEmpty else {
             #if DEBUG
             print("⚠️ observeCallEnd: no matchId - retrying in 0.3s")
@@ -549,7 +552,7 @@ final class MatchingManager: ObservableObject {
     }
 
     func observeCallStatusEnded(completion: @escaping () -> Void) {
-        guard let matchId = currentMatchId ?? UserDefaults.standard.string(forKey: "currentMatchId"),
+        guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               !matchId.isEmpty else { return }
 
         cleanupStatusEndedObserver()
@@ -571,7 +574,7 @@ final class MatchingManager: ObservableObject {
 
     // MARK: - Camera Status Signaling
     func signalCameraStatus(isOn: Bool) {
-        guard let matchId = currentMatchId ?? UserDefaults.standard.string(forKey: "currentMatchId"),
+        guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               let currentUserId = Auth.auth().currentUser?.uid,
               !matchId.isEmpty else { return }
 
@@ -583,7 +586,7 @@ final class MatchingManager: ObservableObject {
     }
 
     func observeOpponentCameraStatus(opponentId: String, onUpdate: @escaping (Bool) -> Void) {
-        guard let matchId = currentMatchId ?? UserDefaults.standard.string(forKey: "currentMatchId"),
+        guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               !matchId.isEmpty else {
             // Retry after delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -655,9 +658,9 @@ final class MatchingManager: ObservableObject {
         }
     }
 
-    private func clearMatchingUserDefaults() {
-        UserDefaults.standard.removeObject(forKey: "currentChannelName")
-        UserDefaults.standard.removeObject(forKey: "currentMatchId")
+    private func clearMatchingData() {
+        KeychainManager.delete(forKey: .currentChannelName)
+        KeychainManager.delete(forKey: .currentMatchId)
     }
 
     func cleanupCallObservers() {
@@ -672,53 +675,39 @@ final class MatchingManager: ObservableObject {
         #endif
     }
 
-    private func cleanupMatchingObservers() {
-        if let handle = statusObserverHandle {
-            database.reference().removeObserver(withHandle: handle)
-            statusObserverHandle = nil
+    private func removeObserver(_ handle: inout DatabaseHandle?) {
+        if let h = handle {
+            database.reference().removeObserver(withHandle: h)
+            handle = nil
         }
+    }
+
+    private func cleanupMatchingObservers() {
+        removeObserver(&statusObserverHandle)
     }
 
     private func cleanupCallEndObserver() {
-        if let handle = callEndObserverHandle {
-            database.reference().removeObserver(withHandle: handle)
-            callEndObserverHandle = nil
-        }
+        removeObserver(&callEndObserverHandle)
     }
 
     private func cleanupTimerObserver() {
-        if let handle = timerObserverHandle {
-            database.reference().removeObserver(withHandle: handle)
-            timerObserverHandle = nil
-        }
+        removeObserver(&timerObserverHandle)
     }
 
     private func cleanupPresenceObserver() {
-        if let handle = presenceObserverHandle {
-            database.reference().removeObserver(withHandle: handle)
-            presenceObserverHandle = nil
-        }
+        removeObserver(&presenceObserverHandle)
     }
 
     private func cleanupStatusEndedObserver() {
-        if let handle = statusEndedObserverHandle {
-            database.reference().removeObserver(withHandle: handle)
-            statusEndedObserverHandle = nil
-        }
+        removeObserver(&statusEndedObserverHandle)
     }
 
     private func cleanupCameraStatusObserver() {
-        if let handle = cameraStatusObserverHandle {
-            database.reference().removeObserver(withHandle: handle)
-            cameraStatusObserverHandle = nil
-        }
+        removeObserver(&cameraStatusObserverHandle)
     }
 
     private func cleanupConnectionObserver() {
-        if let handle = connectionObserverHandle {
-            database.reference().removeObserver(withHandle: handle)
-            connectionObserverHandle = nil
-        }
+        removeObserver(&connectionObserverHandle)
     }
 
     private func cleanupAllObservers() {

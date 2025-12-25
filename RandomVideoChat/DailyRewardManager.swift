@@ -114,9 +114,14 @@ class DailyRewardManager {
     func getTimeUntilNextReward() -> String {
         let calendar = Calendar.current
         let now = Date()
-        let tomorrow = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now)!)
+
+        guard let tomorrowDate = calendar.date(byAdding: .day, value: 1, to: now) else {
+            return "계산 중..."
+        }
+
+        let tomorrow = calendar.startOfDay(for: tomorrowDate)
         let components = calendar.dateComponents([.hour, .minute], from: now, to: tomorrow)
-        
+
         if let hours = components.hour, let minutes = components.minute {
             return "\(hours)시간 \(minutes)분"
         }

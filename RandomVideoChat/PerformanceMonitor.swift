@@ -122,10 +122,3 @@ class PerformanceMonitor {
         perfTimer = nil
     }
 }
-
-enum NetworkQuality {
-    case excellent
-    case good
-    case poor
-    case unknown
-}

@@ -53,7 +53,10 @@ final class AgoraManager: NSObject, ObservableObject {
         static let appId: String = {
             guard let appId = Bundle.main.object(forInfoDictionaryKey: "AGORA_APP_ID") as? String,
                   !appId.isEmpty else {
-                fatalError("⚠️ AGORA_APP_ID not found in Info.plist")
+                #if DEBUG
+                print("❌ AGORA_APP_ID not found in Info.plist - Video calls will not work")
+                #endif
+                return ""
             }
             return appId
         }()
@@ -193,7 +196,7 @@ final class AgoraManager: NSObject, ObservableObject {
         // iOS Audio Session
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playAndRecord, mode: .videoChat, options: [.allowBluetooth])
+            try audioSession.setCategory(.playAndRecord, mode: .videoChat, options: [.allowBluetooth, .defaultToSpeaker])
             try? audioSession.setPreferredSampleRate(48000)
             try? audioSession.setPreferredIOBufferDuration(0.01)
             try audioSession.setActive(true)
@@ -213,14 +216,14 @@ final class AgoraManager: NSObject, ObservableObject {
         engine.setParameters("{\"che.audio.enable.ns.mode\":2}")
         engine.setParameters("{\"che.audio.enable.agc\":true}")
 
-        // Audio routing
-        engine.setDefaultAudioRouteToSpeakerphone(false)
-        engine.setEnableSpeakerphone(false)
-        isSpeakerEnabled = false
+        // Audio routing - use speaker by default for video chat
+        engine.setDefaultAudioRouteToSpeakerphone(true)
+        engine.setEnableSpeakerphone(true)
+        isSpeakerEnabled = true
 
-        // Volume
+        // Volume - boost playback volume for better audibility
         engine.adjustRecordingSignalVolume(100)
-        engine.adjustPlaybackSignalVolume(100)
+        engine.adjustPlaybackSignalVolume(200)
     }
 
     // MARK: - Network Observation
@@ -401,16 +404,9 @@ final class AgoraManager: NSObject, ObservableObject {
         }
 
         // Clear video canvases
-        let localCanvas = AgoraRtcVideoCanvas()
-        localCanvas.uid = 0
-        localCanvas.view = nil
-        engine.setupLocalVideo(localCanvas)
-
+        clearVideoCanvas(uid: 0, isLocal: true)
         if remoteUserId != 0 {
-            let remoteCanvas = AgoraRtcVideoCanvas()
-            remoteCanvas.uid = remoteUserId
-            remoteCanvas.view = nil
-            engine.setupRemoteVideo(remoteCanvas)
+            clearVideoCanvas(uid: remoteUserId, isLocal: false)
         }
 
         // Stop media
@@ -505,6 +501,17 @@ final class AgoraManager: NSObject, ObservableObject {
         }
     }
 
+    private func clearVideoCanvas(uid: UInt, isLocal: Bool) {
+        let canvas = AgoraRtcVideoCanvas()
+        canvas.uid = uid
+        canvas.view = nil
+        if isLocal {
+            engine?.setupLocalVideo(canvas)
+        } else {
+            engine?.setupRemoteVideo(canvas)
+        }
+    }
+
     private func setupRemoteVideoView(for uid: UInt) {
         let view = UIView()
         view.backgroundColor = .black
@@ -555,15 +562,31 @@ final class AgoraManager: NSObject, ObservableObject {
     // MARK: - Private: UID Management
 
     private func getOrCreateLocalUid() -> UInt {
-        let key = "agora_local_uid"
-        if let stored = UserDefaults.standard.object(forKey: key) as? Int, stored > 0 {
-            localUserId = UInt(stored)
+        // Try to load from Keychain first (secure storage)
+        if let stored = KeychainManager.loadUInt(forKey: .agoraLocalUid), stored > 0 {
+            localUserId = stored
             return localUserId
         }
 
-        let newUid = Int.random(in: 1...(Int(UInt32.max) - 1))
-        UserDefaults.standard.set(newUid, forKey: key)
-        localUserId = UInt(newUid)
+        // Migration: Check UserDefaults for legacy data
+        let legacyKey = "agora_local_uid"
+        if let legacyStored = UserDefaults.standard.object(forKey: legacyKey) as? Int, legacyStored > 0 {
+            let uid = UInt(legacyStored)
+            // Migrate to Keychain
+            _ = KeychainManager.save(uid, forKey: .agoraLocalUid)
+            // Remove from UserDefaults
+            UserDefaults.standard.removeObject(forKey: legacyKey)
+            localUserId = uid
+            #if DEBUG
+            print("🔐 Migrated Agora UID to Keychain")
+            #endif
+            return localUserId
+        }
+
+        // Generate new UID and save to Keychain
+        let newUid = UInt(Int.random(in: 1...(Int(UInt32.max) - 1)))
+        _ = KeychainManager.save(newUid, forKey: .agoraLocalUid)
+        localUserId = newUid
         return localUserId
     }
 
@@ -747,10 +770,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
         }
 
         // Clear remote canvas
-        let canvas = AgoraRtcVideoCanvas()
-        canvas.uid = uid
-        canvas.view = nil
-        engine.setupRemoteVideo(canvas)
+        clearVideoCanvas(uid: uid, isLocal: false)
 
         DispatchQueue.main.async {
             self.remoteUserJoined = false
@@ -768,7 +788,7 @@ extension AgoraManager: AgoraRtcEngineDelegate {
 
     func rtcEngine(_ engine: AgoraRtcEngineKit, connectionChangedTo state: AgoraConnectionState, reason: AgoraConnectionChangedReason) {
         #if DEBUG
-        print("🔌 Connection: \(state.rawValue), reason: \(reason.rawValue)")
+        print("🔌 Connection: \(state), reason: \(reason)")
         #endif
 
         switch state {

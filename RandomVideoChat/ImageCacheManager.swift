@@ -15,9 +15,11 @@ final class ImageCacheManager {
         memoryCache.countLimit = 100  // 최대 100개 이미지
         memoryCache.totalCostLimit = 100 * 1024 * 1024  // 100MB
         memoryCache.name = "ImageMemoryCache"
-        
+
         // 디스크 캐시 설정
-        let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            fatalError("Unable to access caches directory - this should never happen on iOS")
+        }
         cacheDirectory = cachesDirectory.appendingPathComponent("ImageCache")
         
         diskCache = URLCache(

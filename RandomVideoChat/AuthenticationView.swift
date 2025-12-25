@@ -1,7 +1,6 @@
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
-import AuthenticationServices
 
 @available(iOS 15.0, *)
 struct AuthenticationView: View {
@@ -11,64 +10,12 @@ struct AuthenticationView: View {
     
     var body: some View {
         ZStack {
-            // Enhanced dynamic gradient background
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(.sRGB, red: 0.02, green: 0.02, blue: 0.08), location: 0.0),
-                        .init(color: Color(.sRGB, red: 0.08, green: 0.03, blue: 0.15), location: 0.3),
-                        .init(color: Color(.sRGB, red: 0.15, green: 0.05, blue: 0.25), location: 0.6),
-                        .init(color: Color(.sRGB, red: 0.05, green: 0.02, blue: 0.12), location: 1.0)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-                // Animated mesh gradient overlay
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(.sRGB, red: 0.3, green: 0.1, blue: 0.4).opacity(0.3),
-                        Color.clear
-                    ]),
-                    center: .topTrailing,
-                    startRadius: 50,
-                    endRadius: 400
-                )
-            }
-            .ignoresSafeArea()
-            
-            // Enhanced floating particles with varied animations
-            GeometryReader { geometry in
-                ForEach(0..<20, id: \.self) { index in
-                    let size = CGFloat.random(in: 20...100)
-                    let opacity = Double.random(in: 0.03...0.08)
-                    
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(.sRGB, red: 0.7, green: 0.4, blue: 0.9).opacity(opacity),
-                                    Color.white.opacity(opacity * 0.6)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: size, height: size)
-                        .position(
-                            x: CGFloat.random(in: -size...geometry.size.width + size),
-                            y: CGFloat.random(in: -size...geometry.size.height + size)
-                        )
-                        .blur(radius: CGFloat.random(in: 15...25))
-                        .animation(
-                            .easeInOut(duration: Double.random(in: 4...8))
-                                .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.2),
-                            value: isLoading
-                        )
-                }
-            }
-            
+            // Gradient background
+            GradientBackgroundView(style: .purple)
+
+            // Floating particles
+            FloatingParticlesView(style: .auth, animationTrigger: $isLoading)
+
             VStack(spacing: 50) {
                 // Modern app branding with enhanced effects
                 VStack(spacing: 25) {

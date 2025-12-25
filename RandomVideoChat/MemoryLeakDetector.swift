@@ -77,16 +77,9 @@ final class MemoryLeakDetector {
     
     private func cleanupDeallocatedObjects() {
         trackingObjects = trackingObjects.filter { $0.object != nil }
-        
+
         // 로그로 정리된 객체 수 확인
         print("🧹 Cleaned up deallocated objects. Remaining: \(trackingObjects.count)")
-    }
-    
-    // 특정 클래스의 인스턴스 개수 확인
-    func getInstanceCount(for className: String) -> Int {
-        return trackingObjects.filter { 
-            $0.object != nil && $0.className == className 
-        }.count
     }
 }
 
