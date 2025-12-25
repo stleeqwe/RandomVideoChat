@@ -127,15 +127,25 @@ class ProfileManager: ObservableObject {
         }
     }
 
-    // MARK: - Preference Rate
+    // MARK: - Preference Rate (DISABLED - 선호도 로직 비활성화)
+    // TODO: 성별 내 백분위 기반 매칭으로 재설계 필요
 
     func calculatePreferenceRate(callCount: Int, uniqueGivers: Int) -> Double {
+        // DISABLED: 선호도 계산 비활성화
+        return 50.0
+        /*
         guard callCount >= 5 else { return 50.0 }
         guard callCount > 0 else { return 50.0 }
         return (Double(uniqueGivers) / Double(callCount)) * 100.0
+        */
     }
 
     func incrementCallCount() {
+        // DISABLED: 선호도 로직 비활성화
+        #if DEBUG
+        print("⏸️ incrementCallCount() - 선호도 로직 비활성화됨")
+        #endif
+        /*
         guard let uid = Auth.auth().currentUser?.uid else { return }
         let userRef = db.collection("users").document(uid)
 
@@ -169,9 +179,15 @@ class ProfileManager: ObservableObject {
                 #endif
             }
         }
+        */
     }
 
     func recordHeartReceived(from giverId: String) {
+        // DISABLED: 선호도 로직 비활성화
+        #if DEBUG
+        print("⏸️ recordHeartReceived() - 선호도 로직 비활성화됨")
+        #endif
+        /*
         guard let uid = Auth.auth().currentUser?.uid else { return }
         guard !giverId.isEmpty else { return }
         let userRef = db.collection("users").document(uid)
@@ -210,5 +226,6 @@ class ProfileManager: ObservableObject {
                 #endif
             }
         }
+        */
     }
 }
