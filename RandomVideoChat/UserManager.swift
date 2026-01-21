@@ -77,6 +77,7 @@ class UserManager: ObservableObject {
     func createUserDocument(uid: String) {
         let userData: [String: Any] = [
             "uid": uid,
+            "ageVerified": true,
             "heartCount": 3,
             "blockedUsers": [],
             "createdAt": Timestamp(date: Date()),
@@ -281,6 +282,7 @@ class UserManager: ObservableObject {
     func cleanupUserData(uid: String, completion: @escaping (Result<Void, Error>) -> Void) {
         let group = DispatchGroup()
         var errors: [Error] = []
+        let errorsLock = NSLock()
 
         // 1. Delete Firestore user document
         group.enter()
@@ -289,7 +291,9 @@ class UserManager: ObservableObject {
                 #if DEBUG
                 print("❌ Firestore 사용자 문서 삭제 실패: \(error.localizedDescription)")
                 #endif
+                errorsLock.lock()
                 errors.append(error)
+                errorsLock.unlock()
             } else {
                 #if DEBUG
                 print("✅ Firestore 사용자 문서 삭제 성공")
@@ -303,7 +307,9 @@ class UserManager: ObservableObject {
         let presenceRef = Database.database().reference().child("user_presence").child(uid)
         presenceRef.removeValue { error, _ in
             if let error = error {
+                errorsLock.lock()
                 errors.append(error)
+                errorsLock.unlock()
             }
             group.leave()
         }
@@ -313,7 +319,9 @@ class UserManager: ObservableObject {
         let notificationsRef = Database.database().reference().child("notifications").child(uid)
         notificationsRef.removeValue { error, _ in
             if let error = error {
+                errorsLock.lock()
                 errors.append(error)
+                errorsLock.unlock()
             }
             group.leave()
         }

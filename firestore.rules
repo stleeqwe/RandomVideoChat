@@ -71,8 +71,10 @@ service cloud.firestore {
                // Validate gender if present
                (!incoming.keys().hasAny(['gender']) || isValidGender(incoming.gender)) &&
                (!incoming.keys().hasAny(['preferredGender']) || isValidGender(incoming.preferredGender)) &&
-               // Heart count must be non-negative
-               (!incoming.keys().hasAny(['heartCount']) || incoming.heartCount >= 0) &&
+               // Heart count must be non-negative and change by reasonable amount
+               (!incoming.keys().hasAny(['heartCount']) ||
+                (incoming.heartCount >= 0 &&
+                 incoming.heartCount <= existing.heartCount + 100)) &&
                // Cannot directly modify suspension-related fields
                incoming.get('isSuspended', existing.get('isSuspended', false)) == existing.get('isSuspended', false);
       }

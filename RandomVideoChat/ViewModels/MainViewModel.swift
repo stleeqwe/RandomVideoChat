@@ -21,6 +21,7 @@ class MainViewModel: ObservableObject {
     // MARK: - Dependencies
 
     private let userManager = UserManager.shared
+    private let permissionManager = PermissionManager.shared
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Computed Properties
@@ -163,74 +164,21 @@ class MainViewModel: ObservableObject {
     // MARK: - Permission Handling
 
     func requestCameraAndMicrophonePermissions() {
-        func status(_ mediaType: AVMediaType) -> AVAuthorizationStatus {
-            AVCaptureDevice.authorizationStatus(for: mediaType)
-        }
-
-        func request(_ mediaType: AVMediaType, _ completion: @escaping (Bool) -> Void) {
-            AVCaptureDevice.requestAccess(for: mediaType, completionHandler: completion)
-        }
-
-        let videoStatus = status(.video)
-        let audioStatus = status(.audio)
-
-        if videoStatus == .authorized && audioStatus == .authorized {
+        // Check if already granted
+        if permissionManager.areAllPermissionsGranted() {
             permissionsGranted = true
             return
         }
 
-        if videoStatus == .notDetermined {
-            request(.video) { [weak self] granted in
-                guard let self = self else { return }
-                if !granted {
-                    DispatchQueue.main.async {
-                        self.permissionMessage = "카메라 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                        self.showPermissionAlert = true
-                    }
-                    return
-                }
+        // Request all permissions
+        permissionManager.requestAllPermissions { [weak self] granted, errorMessage in
+            guard let self = self else { return }
 
-                let micStatus = status(.audio)
-                if micStatus == .notDetermined {
-                    request(.audio) { micGranted in
-                        DispatchQueue.main.async {
-                            self.permissionsGranted = micGranted
-                            if !micGranted {
-                                self.permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                                self.showPermissionAlert = true
-                            }
-                        }
-                    }
-                } else {
-                    DispatchQueue.main.async {
-                        self.permissionsGranted = (micStatus == .authorized)
-                        if micStatus != .authorized {
-                            self.permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                            self.showPermissionAlert = true
-                        }
-                    }
-                }
-            }
-        } else {
-            if audioStatus == .notDetermined {
-                request(.audio) { [weak self] micGranted in
-                    guard let self = self else { return }
-                    DispatchQueue.main.async {
-                        self.permissionsGranted = (videoStatus == .authorized) && micGranted
-                        if !micGranted {
-                            self.permissionMessage = "마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                            self.showPermissionAlert = true
-                        }
-                    }
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.permissionsGranted = (videoStatus == .authorized) && (audioStatus == .authorized)
-                    if !self.permissionsGranted {
-                        self.permissionMessage = "카메라/마이크 권한이 필요합니다. 설정에서 권한을 허용해 주세요."
-                        self.showPermissionAlert = true
-                    }
-                }
+            self.permissionsGranted = granted
+
+            if !granted, let message = errorMessage {
+                self.permissionMessage = message
+                self.showPermissionAlert = true
             }
         }
     }

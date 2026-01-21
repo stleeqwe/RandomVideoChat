@@ -46,6 +46,22 @@ struct VideoCallView: View {
 
             // Timer and end call
             CallTimerView(viewModel: viewModel)
+            
+            // Filter button (왼쪽 하단)
+            VStack {
+                Spacer()
+                HStack {
+                    filterButton
+                    Spacer()
+                }
+                .padding(.leading, 16)
+                .padding(.bottom, 100)
+            }
+            
+            // Filter selection sheet
+            if viewModel.showFilterSelection {
+                filterSelectionOverlay
+            }
         }
         .onAppear {
             viewModel.onCallEnd = {
@@ -129,6 +145,52 @@ struct VideoCallView: View {
             endPoint: .bottom
         )
         .ignoresSafeArea()
+    }
+    
+    // MARK: - Filter UI
+    
+    private var filterButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                viewModel.showFilterSelection.toggle()
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.5))
+                    .frame(width: 50, height: 50)
+                
+                VStack(spacing: 2) {
+                    Image(systemName: viewModel.currentFilter == .none ? "face.smiling" : "face.smiling.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(viewModel.currentFilter == .none ? .white : .yellow)
+                    
+                    if viewModel.currentFilter != .none {
+                        Text("ON")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.yellow)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var filterSelectionOverlay: some View {
+        VStack {
+            Spacer()
+            
+            FilterSelectionView(isPresented: $viewModel.showFilterSelection)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+        .background(
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.showFilterSelection = false
+                    }
+                }
+        )
     }
 
     // MARK: - Alert Buttons

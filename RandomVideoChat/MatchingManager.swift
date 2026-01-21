@@ -25,6 +25,12 @@ enum MatchingState: Equatable {
     }
 }
 
+// MARK: - Observer Info
+private struct ObserverInfo {
+    let reference: DatabaseReference
+    let handle: DatabaseHandle
+}
+
 // MARK: - MatchingManager
 /// Production-grade MatchingManager
 /// Responsibilities:
@@ -41,14 +47,14 @@ final class MatchingManager: ObservableObject {
     private let database = Database.database()
     private let config = MatchingConfig.shared
 
-    // Database handles for cleanup
-    private var statusObserverHandle: DatabaseHandle?
-    private var callEndObserverHandle: DatabaseHandle?
-    private var timerObserverHandle: DatabaseHandle?
-    private var presenceObserverHandle: DatabaseHandle?
-    private var statusEndedObserverHandle: DatabaseHandle?
-    private var cameraStatusObserverHandle: DatabaseHandle?
-    private var connectionObserverHandle: DatabaseHandle?
+    // Database observers with references for proper cleanup
+    private var statusObserver: ObserverInfo?
+    private var callEndObserver: ObserverInfo?
+    private var timerObserver: ObserverInfo?
+    private var presenceObserver: ObserverInfo?
+    private var statusEndedObserver: ObserverInfo?
+    private var cameraStatusObserver: ObserverInfo?
+    private var connectionObserver: ObserverInfo?
 
     // State
     @Published private(set) var state: MatchingState = .idle
@@ -122,7 +128,7 @@ final class MatchingManager: ObservableObject {
     // MARK: - Connection Monitoring
     private func setupConnectionMonitoring() {
         let connectedRef = database.reference().child(".info/connected")
-        connectionObserverHandle = connectedRef.observe(.value) { [weak self] snapshot in
+        let handle = connectedRef.observe(.value) { [weak self] snapshot in
             guard let connected = snapshot.value as? Bool else { return }
             #if DEBUG
             print("🔌 Firebase connection: \(connected ? "✅ connected" : "❌ disconnected")")
@@ -135,6 +141,7 @@ final class MatchingManager: ObservableObject {
                 #endif
             }
         }
+        connectionObserver = ObserverInfo(reference: connectedRef, handle: handle)
     }
 
     // MARK: - Public API: Start Matching
@@ -274,7 +281,7 @@ final class MatchingManager: ObservableObject {
     private func observeMatchResult(userId: String) {
         let userQueueRef = database.reference().child("matching_queue").child(userId)
 
-        statusObserverHandle = userQueueRef.observe(.value) { [weak self] snapshot in
+        let handle = userQueueRef.observe(.value) { [weak self] snapshot in
             guard let self = self,
                   let data = snapshot.value as? [String: Any],
                   let status = data["status"] as? String else { return }
@@ -331,6 +338,7 @@ final class MatchingManager: ObservableObject {
                 }
             }
         }
+        statusObserver = ObserverInfo(reference: userQueueRef, handle: handle)
     }
 
     // MARK: - Presence Tracking
@@ -436,15 +444,17 @@ final class MatchingManager: ObservableObject {
 
         cleanupTimerObserver()
 
-        timerObserverHandle = database.reference()
+        let timerRef = database.reference()
             .child("matches")
             .child(matchId)
             .child("timeRemaining")
-            .observe(.value) { snapshot in
-                if let time = snapshot.value as? Int {
-                    completion(time)
-                }
+
+        let handle = timerRef.observe(.value) { snapshot in
+            if let time = snapshot.value as? Int {
+                completion(time)
             }
+        }
+        timerObserver = ObserverInfo(reference: timerRef, handle: handle)
     }
 
     // MARK: - Call End Signaling
@@ -489,7 +499,7 @@ final class MatchingManager: ObservableObject {
 
         let presenceRef = database.reference().child("presence").child(opponentId)
 
-        presenceObserverHandle = presenceRef.observe(.value) { [weak self] snapshot in
+        let handle = presenceRef.observe(.value) { [weak self] snapshot in
             guard let self = self,
                   let data = snapshot.value as? [String: Any],
                   let isOnline = data["online"] as? Bool else { return }
@@ -516,39 +526,54 @@ final class MatchingManager: ObservableObject {
                 }
             }
         }
+        presenceObserver = ObserverInfo(reference: presenceRef, handle: handle)
     }
+
+    private var observeCallEndRetryCount = 0
+    private let maxObserveCallEndRetries = 10
 
     func observeCallEnd(completion: @escaping () -> Void) {
         guard let matchId = currentMatchId ?? KeychainManager.loadString(forKey: .currentMatchId),
               !matchId.isEmpty else {
+            observeCallEndRetryCount += 1
+            if observeCallEndRetryCount >= maxObserveCallEndRetries {
+                #if DEBUG
+                print("❌ observeCallEnd: max retries reached, giving up")
+                #endif
+                observeCallEndRetryCount = 0
+                return
+            }
             #if DEBUG
-            print("⚠️ observeCallEnd: no matchId - retrying in 0.3s")
+            print("⚠️ observeCallEnd: no matchId - retrying in 0.3s (\(observeCallEndRetryCount)/\(maxObserveCallEndRetries))")
             #endif
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.observeCallEnd(completion: completion)
             }
             return
         }
+        observeCallEndRetryCount = 0
 
         let currentUserId = Auth.auth().currentUser?.uid ?? ""
 
         cleanupCallEndObserver()
 
-        callEndObserverHandle = database.reference()
+        let endRef = database.reference()
             .child("matches")
             .child(matchId)
             .child("endedBy")
-            .observe(.childAdded) { [weak self] snapshot in
-                let endedByUserId = snapshot.key
 
-                if endedByUserId != currentUserId {
-                    #if DEBUG
-                    print("✅ Opponent ended call")
-                    #endif
-                    completion()
-                    self?.cleanupCallEndObserver()
-                }
+        let handle = endRef.observe(.childAdded) { [weak self] snapshot in
+            let endedByUserId = snapshot.key
+
+            if endedByUserId != currentUserId {
+                #if DEBUG
+                print("✅ Opponent ended call")
+                #endif
+                completion()
+                self?.cleanupCallEndObserver()
             }
+        }
+        callEndObserver = ObserverInfo(reference: endRef, handle: handle)
     }
 
     func observeCallStatusEnded(completion: @escaping () -> Void) {
@@ -557,19 +582,21 @@ final class MatchingManager: ObservableObject {
 
         cleanupStatusEndedObserver()
 
-        statusEndedObserverHandle = database.reference()
+        let statusRef = database.reference()
             .child("matches")
             .child(matchId)
             .child("status")
-            .observe(.value) { [weak self] snapshot in
-                if let status = snapshot.value as? String, status == "ended" {
-                    #if DEBUG
-                    print("🔔 Match status changed to 'ended'")
-                    #endif
-                    completion()
-                    self?.cleanupStatusEndedObserver()
-                }
+
+        let handle = statusRef.observe(.value) { [weak self] snapshot in
+            if let status = snapshot.value as? String, status == "ended" {
+                #if DEBUG
+                print("🔔 Match status changed to 'ended'")
+                #endif
+                completion()
+                self?.cleanupStatusEndedObserver()
             }
+        }
+        statusEndedObserver = ObserverInfo(reference: statusRef, handle: handle)
     }
 
     // MARK: - Camera Status Signaling
@@ -603,10 +630,11 @@ final class MatchingManager: ObservableObject {
             .child("cameraStatus")
             .child(opponentId)
 
-        cameraStatusObserverHandle = cameraRef.observe(.value) { snapshot in
+        let handle = cameraRef.observe(.value) { snapshot in
             let isOn = snapshot.value as? Bool ?? true  // Default to camera on
             onUpdate(isOn)
         }
+        cameraStatusObserver = ObserverInfo(reference: cameraRef, handle: handle)
     }
 
     // MARK: - State Management
@@ -675,39 +703,39 @@ final class MatchingManager: ObservableObject {
         #endif
     }
 
-    private func removeObserver(_ handle: inout DatabaseHandle?) {
-        if let h = handle {
-            database.reference().removeObserver(withHandle: h)
-            handle = nil
+    private func removeObserver(_ observer: inout ObserverInfo?) {
+        if let obs = observer {
+            obs.reference.removeObserver(withHandle: obs.handle)
+            observer = nil
         }
     }
 
     private func cleanupMatchingObservers() {
-        removeObserver(&statusObserverHandle)
+        removeObserver(&statusObserver)
     }
 
     private func cleanupCallEndObserver() {
-        removeObserver(&callEndObserverHandle)
+        removeObserver(&callEndObserver)
     }
 
     private func cleanupTimerObserver() {
-        removeObserver(&timerObserverHandle)
+        removeObserver(&timerObserver)
     }
 
     private func cleanupPresenceObserver() {
-        removeObserver(&presenceObserverHandle)
+        removeObserver(&presenceObserver)
     }
 
     private func cleanupStatusEndedObserver() {
-        removeObserver(&statusEndedObserverHandle)
+        removeObserver(&statusEndedObserver)
     }
 
     private func cleanupCameraStatusObserver() {
-        removeObserver(&cameraStatusObserverHandle)
+        removeObserver(&cameraStatusObserver)
     }
 
     private func cleanupConnectionObserver() {
-        removeObserver(&connectionObserverHandle)
+        removeObserver(&connectionObserver)
     }
 
     private func cleanupAllObservers() {

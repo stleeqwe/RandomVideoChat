@@ -438,6 +438,13 @@ final class AgoraManager: NSObject, ObservableObject {
 
     func toggleCamera() -> Bool {
         isCameraOff.toggle()
+        // 실제 비디오 송출 제어
+        engine?.muteLocalVideoStream(isCameraOff)
+        if isCameraOff {
+            engine?.stopPreview()
+        } else {
+            engine?.startPreview()
+        }
         #if DEBUG
         print("📹 Camera off: \(isCameraOff)")
         #endif

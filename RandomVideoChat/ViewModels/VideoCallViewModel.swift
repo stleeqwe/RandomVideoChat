@@ -23,6 +23,10 @@ class VideoCallViewModel: ObservableObject {
     // Audio/Video controls
     @Published var isMuted = false
     @Published var isCameraOn = true
+    
+    // Face Filter
+    @Published var showFilterSelection = false
+    @Published var currentFilter: FaceFilterType = .none
 
     // Report/Block
     @Published var showReportAlert = false
@@ -72,6 +76,11 @@ class VideoCallViewModel: ObservableObject {
         heartManager.$showHeartAnimation
             .receive(on: DispatchQueue.main)
             .assign(to: &$showHeartAnimation)
+        
+        // Bind filter state
+        FaceFilterRenderer.shared.$currentFilter
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$currentFilter)
     }
 
     private func setupCallbacks() {
@@ -218,6 +227,9 @@ class VideoCallViewModel: ObservableObject {
         }
 
         AgoraManager.shared.startCall(channel: channelName)
+        
+        // Face filter 시스템 초기화
+        AgoraManager.shared.setupFaceFilter()
     }
 
     func endCall() {
@@ -236,6 +248,14 @@ class VideoCallViewModel: ObservableObject {
 
     func toggleMute() {
         isMuted = AgoraManager.shared.toggleMute()
+    }
+    
+    func toggleFilterSelection() {
+        showFilterSelection.toggle()
+    }
+    
+    func setFilter(_ filter: FaceFilterType) {
+        AgoraManager.shared.setFaceFilter(filter)
     }
 
     func addTime() {
@@ -362,6 +382,9 @@ class VideoCallViewModel: ObservableObject {
 
         // Heart observer cleanup
         heartManager.stopObserving()
+        
+        // Face filter cleanup
+        AgoraManager.shared.cleanupFaceFilter()
 
         // Signal call end
         if signalEnd {
